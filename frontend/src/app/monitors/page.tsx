@@ -1,16 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import MainLayout from '@/components/layout/MainLayout';
 import { monitorsApi } from '@/lib/api';
 import { Monitor, MonitorStatus, HealthStatus } from '@/types';
 import { formatRelativeTime, formatResponseTime, getStatusLabel, truncateUrl } from '@/lib/utils';
 import { useToastContext } from '@/components/common/ToastProvider';
+import { useDebounce } from '@/hooks/useDebounce';
+import { useThrottle } from '@/hooks/useThrottle';
+import { useAbortableRequest } from '@/hooks/useAbortableRequest';
 import { Plus, Search, Filter, Play, Pause, MoreVertical, Trash2, Edit } from 'lucide-react';
 
 export default function MonitorsPage() {
   const { success, error } = useToastContext();
+  const { getSignal } = useAbortableRequest();
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -25,67 +29,89 @@ export default function MonitorsPage() {
     total_pages: 0,
   });
 
-  const fetchMonitors = async () => {
+  // Debounce keyword filter
+  const debouncedKeyword = useDebounce(filters.keyword, 300);
+
+  const fetchMonitors = useCallback(async () => {
     try {
       setLoading(true);
+      const signal = getSignal();
       const response = await monitorsApi.list({
         page: pagination.page,
         page_size: pagination.page_size,
-        ...filters,
-      });
+        status: filters.status,
+        health_status: filters.health_status,
+        keyword: debouncedKeyword,
+      }, { signal });
       setMonitors(response.items);
       setPagination(response.pagination);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError' || err.name === 'CanceledError') {
+        // Request was cancelled, ignore error
+        return;
+      }
       console.error('Failed to fetch monitors:', err);
       error('获取监控项失败', '请稍后重试');
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.page_size, filters.status, filters.health_status, debouncedKeyword, getSignal, error]);
 
   useEffect(() => {
     fetchMonitors();
-  }, [pagination.page, filters.status, filters.health_status]);
+  }, [fetchMonitors]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPagination(prev => ({ ...prev, page: 1 }));
-    fetchMonitors();
+    // Debounced keyword will trigger fetchMonitors automatically
   };
 
-  const handlePause = async (id: string) => {
-    try {
-      await monitorsApi.pause(id);
-      success('监控已暂停', '监控项已成功暂停');
-      fetchMonitors();
-    } catch (err) {
-      console.error('Failed to pause monitor:', err);
-      error('暂停监控失败', '请稍后重试');
-    }
-  };
+  // Throttled pause handler (prevent double-click)
+  const handlePause = useThrottle(
+    async (id: string) => {
+      try {
+        await monitorsApi.pause(id);
+        success('监控已暂停', '监控项已成功暂停');
+        fetchMonitors();
+      } catch (err) {
+        console.error('Failed to pause monitor:', err);
+        error('暂停监控失败', '请稍后重试');
+      }
+    },
+    1000
+  );
 
-  const handleResume = async (id: string) => {
-    try {
-      await monitorsApi.resume(id);
-      success('监控已恢复', '监控项已成功恢复');
-      fetchMonitors();
-    } catch (err) {
-      console.error('Failed to resume monitor:', err);
-      error('恢复监控失败', '请稍后重试');
-    }
-  };
+  // Throttled resume handler
+  const handleResume = useThrottle(
+    async (id: string) => {
+      try {
+        await monitorsApi.resume(id);
+        success('监控已恢复', '监控项已成功恢复');
+        fetchMonitors();
+      } catch (err) {
+        console.error('Failed to resume monitor:', err);
+        error('恢复监控失败', '请稍后重试');
+      }
+    },
+    1000
+  );
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除这个监控项吗？')) return;
-    try {
-      await monitorsApi.delete(id);
-      success('监控项已删除', '监控项已成功删除');
-      fetchMonitors();
-    } catch (err) {
-      console.error('Failed to delete monitor:', err);
-      error('删除监控项失败', '请稍后重试');
-    }
-  };
+  // Throttled delete handler
+  const handleDelete = useThrottle(
+    async (id: string) => {
+      if (!confirm('确定要删除这个监控项吗？')) return;
+      try {
+        await monitorsApi.delete(id);
+        success('监控项已删除', '监控项已成功删除');
+        fetchMonitors();
+      } catch (err) {
+        console.error('Failed to delete monitor:', err);
+        error('删除监控项失败', '请稍后重试');
+      }
+    },
+    1000
+  );
 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
@@ -174,8 +200,22 @@ export default function MonitorsPage() {
         {/* Monitors List */}
         <div className="card">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+            <div className="p-6">
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex space-x-4 py-3">
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-200 rounded w-1/4 animate-pulse mb-2" />
+                      <div className="h-3 bg-gray-200 rounded w-1/3 animate-pulse" />
+                    </div>
+                    <div className="h-6 bg-gray-200 rounded w-16 animate-pulse" />
+                    <div className="h-6 bg-gray-200 rounded w-16 animate-pulse" />
+                    <div className="h-4 bg-gray-200 rounded w-20 animate-pulse" />
+                    <div className="h-4 bg-gray-200 rounded w-24 animate-pulse" />
+                    <div className="h-8 bg-gray-200 rounded w-24 animate-pulse" />
+                  </div>
+                ))}
+              </div>
             </div>
           ) : monitors.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
@@ -247,11 +287,11 @@ export default function MonitorsPage() {
                           : '从未'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2">
                           {monitor.status === 'active' ? (
                             <button
                               onClick={() => handlePause(monitor.id)}
-                              className="text-gray-400 hover:text-gray-600"
+                              className="p-1 sm:p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
                               title="暂停"
                             >
                               <Pause className="h-4 w-4" />
@@ -259,7 +299,7 @@ export default function MonitorsPage() {
                           ) : (
                             <button
                               onClick={() => handleResume(monitor.id)}
-                              className="text-gray-400 hover:text-green-600"
+                              className="p-1 sm:p-2 text-gray-400 hover:text-green-600 hover:bg-gray-100 rounded"
                               title="恢复"
                             >
                               <Play className="h-4 w-4" />
@@ -267,14 +307,14 @@ export default function MonitorsPage() {
                           )}
                           <Link
                             href={`/monitors/${monitor.id}/edit`}
-                            className="text-gray-400 hover:text-brand-600"
+                            className="p-1 sm:p-2 text-gray-400 hover:text-brand-600 hover:bg-gray-100 rounded"
                             title="编辑"
                           >
                             <Edit className="h-4 w-4" />
                           </Link>
                           <button
                             onClick={() => handleDelete(monitor.id)}
-                            className="text-gray-400 hover:text-red-600"
+                            className="p-1 sm:p-2 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded"
                             title="删除"
                           >
                             <Trash2 className="h-4 w-4" />

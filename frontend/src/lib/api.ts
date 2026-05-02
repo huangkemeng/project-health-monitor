@@ -14,19 +14,31 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
+// Public endpoints that don't require authentication
+const PUBLIC_ENDPOINTS = [
+  '/auth/login',
+  '/auth/register',
+  '/health',
+];
+
 // Create axios instance
 const api: AxiosInstance = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000, // 30 second timeout
 });
 
 // Request interceptor - add auth token
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    if (token) {
+    const isPublicEndpoint = PUBLIC_ENDPOINTS.some(endpoint =>
+      config.url?.includes(endpoint)
+    );
+
+    if (token && !isPublicEndpoint) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -110,55 +122,65 @@ export const authApi = {
 
 // Webhooks API
 export const webhooksApi = {
-  list: () => apiClient.get<{ items: Webhook[] }>('/webhooks'),
+  list: (config?: AxiosRequestConfig) =>
+    apiClient.get<{ items: Webhook[] }>('/webhooks', config),
 
-  get: (id: string) => apiClient.get<Webhook>(`/webhooks/${id}`),
+  get: (id: string, config?: AxiosRequestConfig) =>
+    apiClient.get<Webhook>(`/webhooks/${id}`, config),
 
-  getDefault: () => apiClient.get<Webhook | null>('/webhooks/default'),
+  getDefault: (config?: AxiosRequestConfig) =>
+    apiClient.get<Webhook | null>('/webhooks/default', config),
 
-  create: (data: CreateWebhookData) =>
-    apiClient.post<Webhook>('/webhooks', data),
+  create: (data: CreateWebhookData, config?: AxiosRequestConfig) =>
+    apiClient.post<Webhook>('/webhooks', data, config),
 
-  update: (id: string, data: Partial<CreateWebhookData>) =>
-    apiClient.put<Webhook>(`/webhooks/${id}`, data),
+  update: (id: string, data: Partial<CreateWebhookData>, config?: AxiosRequestConfig) =>
+    apiClient.put<Webhook>(`/webhooks/${id}`, data, config),
 
-  delete: (id: string) => apiClient.delete(`/webhooks/${id}`),
+  delete: (id: string, config?: AxiosRequestConfig) =>
+    apiClient.delete(`/webhooks/${id}`, config),
 
-  test: (id: string) => apiClient.post(`/webhooks/${id}/test`, {}),
+  test: (id: string, config?: AxiosRequestConfig) =>
+    apiClient.post(`/webhooks/${id}/test`, {}, config),
 };
 
 // Monitors API
 export const monitorsApi = {
-  list: (params?: { page?: number; page_size?: number; status?: string; health_status?: string; keyword?: string }) =>
-    apiClient.get<PaginatedResponse<Monitor>>('/monitors', { params }),
+  list: (params?: { page?: number; page_size?: number; status?: string; health_status?: string; keyword?: string }, config?: AxiosRequestConfig) =>
+    apiClient.get<PaginatedResponse<Monitor>>('/monitors', { params, ...config }),
 
-  get: (id: string) => apiClient.get<Monitor>(`/monitors/${id}`),
+  get: (id: string, config?: AxiosRequestConfig) =>
+    apiClient.get<Monitor>(`/monitors/${id}`, config),
 
-  create: (data: CreateMonitorData) =>
-    apiClient.post<Monitor>('/monitors', data),
+  create: (data: CreateMonitorData, config?: AxiosRequestConfig) =>
+    apiClient.post<Monitor>('/monitors', data, config),
 
-  update: (id: string, data: Partial<CreateMonitorData>) =>
-    apiClient.put<Monitor>(`/monitors/${id}`, data),
+  update: (id: string, data: Partial<CreateMonitorData>, config?: AxiosRequestConfig) =>
+    apiClient.put<Monitor>(`/monitors/${id}`, data, config),
 
-  delete: (id: string) => apiClient.delete(`/monitors/${id}`),
+  delete: (id: string, config?: AxiosRequestConfig) =>
+    apiClient.delete(`/monitors/${id}`, config),
 
-  pause: (id: string) => apiClient.post<{ id: string; status: string }>(`/monitors/${id}/pause`, {}),
+  pause: (id: string, config?: AxiosRequestConfig) =>
+    apiClient.post<{ id: string; status: string }>(`/monitors/${id}/pause`, {}, config),
 
-  resume: (id: string) => apiClient.post<{ id: string; status: string }>(`/monitors/${id}/resume`, {}),
+  resume: (id: string, config?: AxiosRequestConfig) =>
+    apiClient.post<{ id: string; status: string }>(`/monitors/${id}/resume`, {}, config),
 };
 
 // Dashboard API
 export const dashboardApi = {
-  get: () => apiClient.get<DashboardData>('/dashboard'),
+  get: (config?: AxiosRequestConfig) =>
+    apiClient.get<DashboardData>('/dashboard', config),
 };
 
 // History API
 export const historyApi = {
-  getChecks: (params?: { monitor_id?: string; status?: string; start_time?: string; end_time?: string; page?: number; page_size?: number }) =>
-    apiClient.get<PaginatedResponse<CheckLog>>('/history/checks', { params }),
+  getChecks: (params?: { monitor_id?: string; status?: string; start_time?: string; end_time?: string; page?: number; page_size?: number }, config?: AxiosRequestConfig) =>
+    apiClient.get<PaginatedResponse<CheckLog>>('/history/checks', { params, ...config }),
 
-  getAlerts: (params?: { monitor_id?: string; status?: string; start_time?: string; end_time?: string; page?: number; page_size?: number }) =>
-    apiClient.get<PaginatedResponse<Alert>>('/history/alerts', { params }),
+  getAlerts: (params?: { monitor_id?: string; status?: string; start_time?: string; end_time?: string; page?: number; page_size?: number }, config?: AxiosRequestConfig) =>
+    apiClient.get<PaginatedResponse<Alert>>('/history/alerts', { params, ...config }),
 };
 
 export default api;

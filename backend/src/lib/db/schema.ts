@@ -113,9 +113,20 @@ CREATE TABLE IF NOT EXISTS alert_silences (
   INDEX idx_silences_expires (expires_at),
   INDEX idx_silences_monitor_expires (monitor_id, expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Login attempts table (for login lock mechanism)
+CREATE TABLE IF NOT EXISTS login_attempts (
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  username VARCHAR(50) NOT NULL,
+  ip_address VARCHAR(45),
+  attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_login_username_time (username, attempted_at),
+  INDEX idx_login_attempted_at (attempted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 `;
 
 export const dropTablesSQL = `
+DROP TABLE IF EXISTS login_attempts;
 DROP TABLE IF EXISTS alert_silences;
 DROP TABLE IF EXISTS alerts;
 DROP TABLE IF EXISTS check_logs;

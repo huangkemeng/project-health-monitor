@@ -219,6 +219,22 @@ export interface AlertSilence {
   created_at: Date;
 }
 
+// Login Attempt Types
+export interface LoginAttempt {
+  id: string;
+  username: string;
+  ip_address: string | null;
+  attempted_at: Date;
+}
+
+// JWT Payload
+export interface JwtPayload {
+  userId: string;
+  username: string;
+  iat: number;
+  exp: number;
+}
+
 // Authenticated Request
 export interface AuthenticatedRequest extends Express.Request {
   user?: JwtPayload;

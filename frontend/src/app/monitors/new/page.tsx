@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { monitorsApi, webhooksApi } from '@/lib/api';
 import { Webhook, HttpMethod } from '@/types';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NewMonitorPage() {
@@ -13,6 +13,8 @@ export default function NewMonitorPage() {
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showUrlConfirm, setShowUrlConfirm] = useState(false);
+  const [urlTestResult, setUrlTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     url: '',
@@ -44,12 +46,62 @@ export default function NewMonitorPage() {
     fetchWebhooks();
   }, []);
 
+  // Test URL reachability
+  const testUrlReachability = async (): Promise<{ success: boolean; message: string }> => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const fetchOptions: RequestInit = {
+        method: formData.method,
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'ProjectHealthMonitor/1.0',
+          ...safeJsonParse(formData.headers, {}),
+        },
+      };
+
+      if (formData.body && ['POST', 'PUT'].includes(formData.method)) {
+        fetchOptions.body = formData.body;
+      }
+
+      const response = await fetch(formData.url, fetchOptions);
+      clearTimeout(timeoutId);
+
+      if (response.status === formData.expected_status) {
+        return { success: true, message: 'URL 可访问' };
+      } else {
+        return {
+          success: false,
+          message: `URL 返回状态码 ${response.status}，期望 ${formData.expected_status}`,
+        };
+      }
+    } catch (err) {
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          return { success: false, message: 'URL 测试超时（5秒）' };
+        }
+        return { success: false, message: `无法访问: ${err.message}` };
+      }
+      return { success: false, message: 'URL 不可达' };
+    }
+  };
+
+  const safeJsonParse = (json: string, defaultValue: Record<string, string>): Record<string, string> => {
+    try {
+      return JSON.parse(json) as Record<string, string>;
+    } catch {
+      return defaultValue;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
+      // Validate headers JSON
       let headers = {};
       try {
         headers = JSON.parse(formData.headers);
@@ -57,6 +109,17 @@ export default function NewMonitorPage() {
         setError('Headers 必须是有效的 JSON 格式');
         setLoading(false);
         return;
+      }
+
+      // Test URL reachability before saving
+      if (!showUrlConfirm) {
+        const testResult = await testUrlReachability();
+        if (!testResult.success) {
+          setUrlTestResult(testResult);
+          setShowUrlConfirm(true);
+          setLoading(false);
+          return;
+        }
       }
 
       await monitorsApi.create({
@@ -79,6 +142,19 @@ export default function NewMonitorPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleConfirmContinue = () => {
+    setShowUrlConfirm(false);
+    setLoading(true);
+    // Re-submit the form, skipping the URL test
+    const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+    handleSubmit(fakeEvent);
+  };
+
+  const handleCancelConfirm = () => {
+    setShowUrlConfirm(false);
+    setUrlTestResult(null);
   };
 
   return (
@@ -106,6 +182,39 @@ export default function NewMonitorPage() {
               </div>
             )}
 
+            {/* URL Test Confirmation Modal */}
+            {showUrlConfirm && urlTestResult && (
+              <div className="rounded-md bg-yellow-50 border border-yellow-200 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="text-sm font-medium text-yellow-800">
+                      URL 不可达
+                    </h3>
+                    <p className="mt-1 text-sm text-yellow-700">
+                      {urlTestResult.message}，是否继续保存？
+                    </p>
+                    <div className="mt-3 flex gap-3">
+                      <button
+                        type="button"
+                        onClick={handleConfirmContinue}
+                        className="px-3 py-1.5 text-sm font-medium text-yellow-800 bg-yellow-100 rounded-md hover:bg-yellow-200"
+                      >
+                        继续保存
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelConfirm}
+                        className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
+                      >
+                        返回修改
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="label">名称 *</label>
               <input
@@ -129,6 +238,9 @@ export default function NewMonitorPage() {
                 onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                 placeholder="https://api.example.com/health"
               />
+              <p className="mt-1 text-xs text-gray-500">
+                保存前将自动测试 URL 是否可达
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

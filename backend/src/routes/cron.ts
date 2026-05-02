@@ -5,8 +5,15 @@ import type { Monitor, Webhook, Alert, CheckLog, AlertSilence } from '../types';
 
 const router = Router();
 
-// Cron secret for authentication
-const CRON_SECRET = process.env.CRON_SECRET || 'your-cron-secret-key';
+// Cron secret for authentication - must be set in environment
+const CRON_SECRET = process.env.CRON_SECRET;
+
+// Validate cron secret on startup
+if (!CRON_SECRET) {
+  console.error('ERROR: CRON_SECRET environment variable is not set!');
+  console.error('Please set a secure random string for CRON_SECRET');
+  process.exit(1);
+}
 
 // Silence duration in minutes (15 minutes)
 const SILENCE_DURATION_MINUTES = 15;

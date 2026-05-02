@@ -46,8 +46,24 @@ export default function NewMonitorPage() {
     fetchWebhooks();
   }, []);
 
+  // Validate URL is safe (prevent XSS via javascript: protocol)
+  const isSafeUrl = (url: string): boolean => {
+    try {
+      const parsed = new URL(url);
+      // Only allow http and https protocols
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
   // Test URL reachability
   const testUrlReachability = async (): Promise<{ success: boolean; message: string }> => {
+    // First check URL safety
+    if (!isSafeUrl(formData.url)) {
+      return { success: false, message: 'URL 不安全，仅支持 http:// 或 https:// 协议' };
+    }
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);

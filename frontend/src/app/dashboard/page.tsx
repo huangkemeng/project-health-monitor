@@ -14,25 +14,43 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const response = await dashboardApi.get();
-      setData(response);
-      setError(null);
-    } catch (err) {
-      setError('获取数据失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    // AbortController for canceling requests
+    const abortController = new AbortController();
+    let isMounted = true;
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const response = await dashboardApi.get();
+        // Only update state if component is still mounted
+        if (isMounted) {
+          setData(response);
+          setError(null);
+        }
+      } catch (err) {
+        // Only update state if component is still mounted and not aborted
+        if (isMounted && !abortController.signal.aborted) {
+          setError('获取数据失败');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
     fetchData();
 
     // Auto refresh every 30 seconds
     const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      abortController.abort();
+      clearInterval(interval);
+    };
   }, []);
 
   if (loading && !data) {

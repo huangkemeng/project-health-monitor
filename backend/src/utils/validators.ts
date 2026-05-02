@@ -79,6 +79,29 @@ export function sanitizeString(input: string | null | undefined): string {
 }
 
 /**
+ * Sanitize search keyword for SQL LIKE
+ * Removes SQL wildcard characters to prevent injection
+ */
+export function sanitizeSearchKeyword(keyword: string | null | undefined): string {
+  if (!keyword) return '';
+  // Remove SQL wildcard characters and other potentially dangerous characters
+  return keyword.trim().replace(/[%_\\'";\\]/g, '');
+}
+
+/**
+ * Validate URL is safe (only allows http/https protocols)
+ */
+export function isSafeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    // Only allow http and https protocols
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Parse JSON safely
  */
 export function safeJsonParse<T>(json: string, defaultValue: T): T {

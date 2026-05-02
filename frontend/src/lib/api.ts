@@ -1,5 +1,16 @@
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
-import { ApiResponse, ApiError } from '@/types';
+import {
+  ApiResponse,
+  ApiError,
+  Webhook,
+  CreateWebhookData,
+  Monitor,
+  PaginatedResponse,
+  CreateMonitorData,
+  DashboardData,
+  CheckLog,
+  Alert
+} from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -99,17 +110,17 @@ export const authApi = {
 
 // Webhooks API
 export const webhooksApi = {
-  list: () => apiClient.get<{ items: import('@/types').Webhook[] }>('/webhooks'),
+  list: () => apiClient.get<{ items: Webhook[] }>('/webhooks'),
 
-  get: (id: string) => apiClient.get<import('@/types').Webhook>(`/webhooks/${id}`),
+  get: (id: string) => apiClient.get<Webhook>(`/webhooks/${id}`),
 
-  getDefault: () => apiClient.get<import('@/types').Webhook | null>('/webhooks/default'),
+  getDefault: () => apiClient.get<Webhook | null>('/webhooks/default'),
 
-  create: (data: import('@/types').CreateWebhookData) =>
-    apiClient.post<import('@/types').Webhook>('/webhooks', data),
+  create: (data: CreateWebhookData) =>
+    apiClient.post<Webhook>('/webhooks', data),
 
-  update: (id: string, data: Partial<import('@/types').CreateWebhookData>) =>
-    apiClient.put<import('@/types').Webhook>(`/webhooks/${id}`, data),
+  update: (id: string, data: Partial<CreateWebhookData>) =>
+    apiClient.put<Webhook>(`/webhooks/${id}`, data),
 
   delete: (id: string) => apiClient.delete(`/webhooks/${id}`),
 
@@ -119,15 +130,15 @@ export const webhooksApi = {
 // Monitors API
 export const monitorsApi = {
   list: (params?: { page?: number; page_size?: number; status?: string; health_status?: string; keyword?: string }) =>
-    apiClient.get<import('@/types').PaginatedResponse<import('@/types').Monitor>>('/monitors', { params }),
+    apiClient.get<PaginatedResponse<Monitor>>('/monitors', { params }),
 
-  get: (id: string) => apiClient.get<import('@/types').Monitor>(`/monitors/${id}`),
+  get: (id: string) => apiClient.get<Monitor>(`/monitors/${id}`),
 
-  create: (data: import('@/types').CreateMonitorData) =>
-    apiClient.post<import('@/types').Monitor>('/monitors', data),
+  create: (data: CreateMonitorData) =>
+    apiClient.post<Monitor>('/monitors', data),
 
-  update: (id: string, data: Partial<import('@/types').CreateMonitorData>) =>
-    apiClient.put<import('@/types').Monitor>(`/monitors/${id}`, data),
+  update: (id: string, data: Partial<CreateMonitorData>) =>
+    apiClient.put<Monitor>(`/monitors/${id}`, data),
 
   delete: (id: string) => apiClient.delete(`/monitors/${id}`),
 
@@ -138,16 +149,16 @@ export const monitorsApi = {
 
 // Dashboard API
 export const dashboardApi = {
-  get: () => apiClient.get<import('@/types').DashboardData>('/dashboard'),
+  get: () => apiClient.get<DashboardData>('/dashboard'),
 };
 
 // History API
 export const historyApi = {
   getChecks: (params?: { monitor_id?: string; status?: string; start_time?: string; end_time?: string; page?: number; page_size?: number }) =>
-    apiClient.get<import('@/types').PaginatedResponse<import('@/types').CheckLog>>('/history/checks', { params }),
+    apiClient.get<PaginatedResponse<CheckLog>>('/history/checks', { params }),
 
   getAlerts: (params?: { monitor_id?: string; status?: string; start_time?: string; end_time?: string; page?: number; page_size?: number }) =>
-    apiClient.get<import('@/types').PaginatedResponse<import('@/types').Alert>>('/history/alerts', { params }),
+    apiClient.get<PaginatedResponse<Alert>>('/history/alerts', { params }),
 };
 
 export default api;

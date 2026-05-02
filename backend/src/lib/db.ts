@@ -3,12 +3,23 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Validate required environment variables
+const requiredEnvVars = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingVars.length > 0) {
+  console.error('ERROR: Missing required database environment variables:');
+  missingVars.forEach(varName => console.error(`  - ${varName}`));
+  console.error('Please set all required database configuration in environment variables');
+  process.exit(1);
+}
+
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
+  host: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT || '3306'),
-  database: process.env.DB_NAME || 'health_monitor',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '123456',
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
   waitForConnections: true,
   connectionLimit: parseInt(process.env.DB_POOL_SIZE || '10'),
   queueLimit: 0,

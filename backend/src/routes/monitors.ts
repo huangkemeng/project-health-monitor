@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { query, queryOne, execute } from '../lib/db';
 import { authenticate } from '../middleware/auth';
 import { success, error, created, validationError, notFound } from '../utils/api-response';
-import { isValidUrl, isValidHttpMethod, safeJsonParse, sanitizeString } from '../utils/validators';
+import { isValidUrl, isValidHttpMethod, safeJsonParse, sanitizeString, sanitizeSearchKeyword } from '../utils/validators';
 import type { Monitor, MonitorResponse, Webhook, CheckLog, MonitorStats, HttpMethod } from '../types';
 
 const router = Router();
@@ -51,8 +51,11 @@ router.get(
       }
 
       if (keyword) {
-        conditions.push('(m.name LIKE ? OR m.url LIKE ?)');
-        values.push(`%${keyword}%`, `%${keyword}%`);
+        const sanitizedKeyword = sanitizeSearchKeyword(keyword);
+        if (sanitizedKeyword) {
+          conditions.push('(m.name LIKE ? OR m.url LIKE ?)');
+          values.push(`%${sanitizedKeyword}%`, `%${sanitizedKeyword}%`);
+        }
       }
 
       const whereClause = conditions.join(' AND ');

@@ -120,12 +120,13 @@ router.post(
 
 // Check if account is locked due to failed login attempts
 async function isAccountLocked(username: string): Promise<boolean> {
+  // Check attempts by username or email (to prevent bypass via email login)
   const attempts = await query<LoginAttempt>(
     `SELECT * FROM login_attempts 
-     WHERE username = ? 
+     WHERE (username = ? OR username = (SELECT email FROM users WHERE username = ?))
      AND attempted_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)
      ORDER BY attempted_at DESC`,
-    [username, LOCK_DURATION_MINUTES]
+    [username, username, LOCK_DURATION_MINUTES]
   );
   return attempts.length >= MAX_LOGIN_ATTEMPTS;
 }
@@ -166,18 +167,21 @@ router.post(
       const sanitizedUsername = sanitizeString(username);
       const ipAddress = req.ip || req.socket.remoteAddress || null;
 
-      // Check if account is locked
-      const isLocked = await isAccountLocked(sanitizedUsername);
-      if (isLocked) {
-        forbidden(res, `账号已锁定，请${LOCK_DURATION_MINUTES}分钟后重试`);
-        return;
-      }
-
-      // Find user by username or email
+      // Find user by username or email first (before lock check)
       const user = await queryOne<User>(
         'SELECT * FROM users WHERE username = ? OR email = ?',
         [sanitizedUsername, sanitizedUsername.toLowerCase()]
       );
+
+      // Use actual username for lock check (prevents bypass via email)
+      const lockCheckUsername = user ? user.username : sanitizedUsername;
+
+      // Check if account is locked
+      const isLocked = await isAccountLocked(lockCheckUsername);
+      if (isLocked) {
+        forbidden(res, `账号已锁定，请${LOCK_DURATION_MINUTES}分钟后重试`);
+        return;
+      }
 
       if (!user) {
         await recordFailedLogin(sanitizedUsername, ipAddress);

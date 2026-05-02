@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "name": "project-health-monitor-backend",
+  "builds": [
+    {
+      "src": "src/index.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "src/index.ts"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/check",
+      "schedule": "* * * * *"
+    }
+  ]
+}

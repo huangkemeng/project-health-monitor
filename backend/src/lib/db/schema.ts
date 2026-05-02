@@ -123,9 +123,24 @@ CREATE TABLE IF NOT EXISTS login_attempts (
   INDEX idx_login_username_time (username, attempted_at),
   INDEX idx_login_attempted_at (attempted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Cron job logs table (for cron job execution tracking)
+CREATE TABLE IF NOT EXISTS cron_job_logs (
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  ended_at TIMESTAMP NULL,
+  status VARCHAR(20) DEFAULT 'running',
+  total_monitors INT DEFAULT 0,
+  success_count INT DEFAULT 0,
+  failure_count INT DEFAULT 0,
+  error_message TEXT,
+  INDEX idx_cron_logs_status (status),
+  INDEX idx_cron_logs_started (started_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 `;
 
 export const dropTablesSQL = `
+DROP TABLE IF EXISTS cron_job_logs;
 DROP TABLE IF EXISTS login_attempts;
 DROP TABLE IF EXISTS alert_silences;
 DROP TABLE IF EXISTS alerts;

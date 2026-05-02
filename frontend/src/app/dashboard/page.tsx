@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import StatCard from '@/components/dashboard/StatCard';
 import MonitorStatusList from '@/components/dashboard/MonitorStatusList';
@@ -13,24 +13,34 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await dashboardApi.get();
+      setData(response);
+      setError(null);
+    } catch (err) {
+      setError('获取数据失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    // AbortController for canceling requests
-    const abortController = new AbortController();
     let isMounted = true;
 
-    const fetchData = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
         const response = await dashboardApi.get();
-        // Only update state if component is still mounted
         if (isMounted) {
           setData(response);
           setError(null);
         }
       } catch (err) {
-        // Only update state if component is still mounted and not aborted
-        if (isMounted && !abortController.signal.aborted) {
+        if (isMounted) {
           setError('获取数据失败');
         }
       } finally {
@@ -40,18 +50,26 @@ export default function DashboardPage() {
       }
     };
 
-    fetchData();
+    loadData();
 
     // Auto refresh every 30 seconds
-    const interval = setInterval(fetchData, 30000);
+    const interval = setInterval(() => {
+      if (isMounted) {
+        loadData();
+      }
+    }, 30000);
 
     // Cleanup function
     return () => {
       isMounted = false;
-      abortController.abort();
       clearInterval(interval);
     };
-  }, []);
+  }, [refreshKey]);
+
+  const handleRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+    fetchData();
+  };
 
   if (loading && !data) {
     return (
@@ -69,7 +87,7 @@ export default function DashboardPage() {
         <div className="text-center py-12">
           <p className="text-red-600">{error}</p>
           <button
-            onClick={fetchData}
+            onClick={handleRefresh}
             className="mt-4 text-brand-600 hover:text-brand-500"
           >
             重试
@@ -97,7 +115,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">监控大盘</h1>
           <button
-            onClick={fetchData}
+            onClick={handleRefresh}
             disabled={loading}
             className="text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50"
           >

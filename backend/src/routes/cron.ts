@@ -41,30 +41,8 @@ interface CronJobLog {
   error_message: string | null;
 }
 
-// Initialize cron job tracking table
-async function initCronJobLogTable(): Promise<void> {
-  try {
-    await execute(`
-      CREATE TABLE IF NOT EXISTS cron_job_logs (
-        id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        ended_at TIMESTAMP NULL,
-        status VARCHAR(20) DEFAULT 'running',
-        total_monitors INT DEFAULT 0,
-        success_count INT DEFAULT 0,
-        failure_count INT DEFAULT 0,
-        error_message TEXT,
-        INDEX idx_cron_logs_status (status),
-        INDEX idx_cron_logs_started (started_at)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-  } catch (err) {
-    console.error('Failed to create cron_job_logs table:', err);
-  }
-}
-
-// Initialize table on module load
-initCronJobLogTable();
+// Note: cron_job_logs table is created by auto-migrate on server startup
+// See src/lib/db/schema.ts for table definition
 
 // Send alert notification for cron job failure
 async function sendCronFailureAlert(errorMessage: string, jobLogId: string): Promise<void> {

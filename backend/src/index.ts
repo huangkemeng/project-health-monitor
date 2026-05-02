@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { getDbHealth } from './lib/db';
+import { autoMigrate } from './lib/db/auto-migrate';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -101,9 +102,13 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+
+  // Run database auto-migration on startup
+  console.log('[Server] Running database migrations...');
+  await autoMigrate();
 });
 
 export default app;

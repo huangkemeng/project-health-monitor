@@ -107,7 +107,7 @@ export const apiClient = {
 // Auth API
 export const authApi = {
   login: (credentials: { username: string; password: string; remember_me?: boolean }) =>
-    apiClient.post<{ access_token: string; token_type: string; expires_in: number; user: { id: string; username: string; email: string } }>('/auth/login', credentials),
+    apiClient.post<{ token: string; user: { id: string; username: string; email: string } }>('/auth/login', credentials),
 
   register: (data: { username: string; email: string; password: string; confirm_password: string }) =>
     apiClient.post<{ id: string; username: string; email: string; created_at: string }>('/auth/register', data),

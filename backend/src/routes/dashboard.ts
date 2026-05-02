@@ -10,19 +10,22 @@ const router = Router();
 router.get('/', authenticate, async (req, res) => {
   try {
     const userId = req.user!.userId;
+    console.log('[Dashboard] Fetching data for user:', userId);
 
     // Get summary counts
+    console.log('[Dashboard] Executing summary query...');
     const summaryResult = await query<DashboardSummary>(
-      `SELECT 
+      `SELECT
         COUNT(*) as total,
         SUM(CASE WHEN health_status = 'normal' AND status = 'active' THEN 1 ELSE 0 END) as normal,
         SUM(CASE WHEN health_status = 'warning' THEN 1 ELSE 0 END) as warning,
         SUM(CASE WHEN health_status = 'critical' THEN 1 ELSE 0 END) as critical,
         SUM(CASE WHEN status = 'paused' THEN 1 ELSE 0 END) as paused
-       FROM monitors 
+       FROM monitors
        WHERE owner_id = ? AND status != 'archived'`,
       [userId]
     );
+    console.log('[Dashboard] Summary result:', summaryResult);
 
     const summary: DashboardSummary = {
       total: Number(summaryResult[0]?.total) || 0,
@@ -33,15 +36,17 @@ router.get('/', authenticate, async (req, res) => {
     };
 
     // Get recent alerts
+    console.log('[Dashboard] Executing alerts query...');
     const recentAlerts = await query<Alert & { monitor_name: string }>(
-      `SELECT a.*, m.name as monitor_name 
-       FROM alerts a 
-       JOIN monitors m ON a.monitor_id = m.id 
-       WHERE m.owner_id = ? 
-       ORDER BY a.started_at DESC 
+      `SELECT a.*, m.name as monitor_name
+       FROM alerts a
+       JOIN monitors m ON a.monitor_id = m.id
+       WHERE m.owner_id = ?
+       ORDER BY a.started_at DESC
        LIMIT 5`,
       [userId]
     );
+    console.log('[Dashboard] Alerts result count:', recentAlerts.length);
 
     const alertsResponse: AlertResponse[] = recentAlerts.map(a => ({
       id: a.id,
@@ -57,18 +62,20 @@ router.get('/', authenticate, async (req, res) => {
     }));
 
     // Get active monitors with latest status
+    console.log('[Dashboard] Executing monitors query...');
     const monitors = await query<Monitor>(
-      `SELECT * FROM monitors 
-       WHERE owner_id = ? AND status = 'active' 
-       ORDER BY 
-         CASE health_status 
-           WHEN 'critical' THEN 1 
-           WHEN 'warning' THEN 2 
-           WHEN 'normal' THEN 3 
+      `SELECT * FROM monitors
+       WHERE owner_id = ? AND status = 'active'
+       ORDER BY
+         CASE health_status
+           WHEN 'critical' THEN 1
+           WHEN 'warning' THEN 2
+           WHEN 'normal' THEN 3
          END,
          last_check_at DESC`,
       [userId]
     );
+    console.log('[Dashboard] Monitors result count:', monitors.length);
 
     const monitorItems: DashboardMonitorItem[] = monitors.map(m => ({
       id: m.id,
@@ -88,6 +95,10 @@ router.get('/', authenticate, async (req, res) => {
     success(res, dashboardData);
   } catch (err) {
     console.error('Get dashboard error:', err);
+    if (err instanceof Error) {
+      console.error('Error message:', err.message);
+      console.error('Error stack:', err.stack);
+    }
     error(res, '获取监控大盘数据失败');
   }
 });

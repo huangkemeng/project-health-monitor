@@ -36,18 +36,23 @@ export const useAuthStore = create<AuthState>()(
             remember_me: rememberMe,
           });
 
-          localStorage.setItem('token', response.access_token);
+          // Store token in localStorage before updating state
+          localStorage.setItem('token', response.token);
 
+          // Update state synchronously
           set({
             user: {
               ...response.user,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             },
-            token: response.access_token,
+            token: response.token,
             isAuthenticated: true,
             isLoading: false,
           });
+
+          // Wait a tick to ensure localStorage is written
+          await new Promise(resolve => setTimeout(resolve, 0));
         } catch (error) {
           const message = error instanceof Error ? error.message : '登录失败';
           set({ isLoading: false, error: message });

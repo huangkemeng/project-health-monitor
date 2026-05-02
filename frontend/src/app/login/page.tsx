@@ -34,11 +34,13 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
-    
+
     if (!validateForm()) return;
 
     try {
       await login(formData.username, formData.password, formData.rememberMe);
+      // Small delay to ensure token is written to localStorage
+      await new Promise(resolve => setTimeout(resolve, 100));
       router.push('/dashboard');
     } catch {
       // Error is handled by the store

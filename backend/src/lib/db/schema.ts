@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS monitors (
   method VARCHAR(10) DEFAULT 'GET',
   headers JSON,
   body TEXT,
-  interval INT DEFAULT 60,
+  check_interval INT DEFAULT 60,
   timeout INT DEFAULT 10,
   expected_status INT DEFAULT 200,
   retry_times INT DEFAULT 5,

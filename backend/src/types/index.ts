@@ -29,7 +29,7 @@ export interface Monitor {
   method: HttpMethod;
   headers: Record<string, string>;
   body: string | null;
-  interval: number;
+  check_interval: number;
   timeout: number;
   expected_status: number;
   retry_times: number;
@@ -51,7 +51,7 @@ export interface MonitorResponse {
   method: HttpMethod;
   headers: Record<string, string>;
   body: string | null;
-  interval: number;
+  check_interval: number;
   timeout: number;
   expected_status: number;
   retry_times: number;

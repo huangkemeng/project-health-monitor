@@ -149,7 +149,7 @@ router.get(
         method: monitor.method,
         headers: monitor.headers,
         body: monitor.body,
-        interval: monitor.interval,
+        check_interval: monitor.check_interval,
         timeout: monitor.timeout,
         expected_status: monitor.expected_status,
         retry_times: monitor.retry_times,
@@ -196,7 +196,7 @@ router.post(
     body('name').trim().isLength({ min: 1, max: 50 }),
     body('url').isURL(),
     body('method').optional().isIn(['GET', 'POST', 'PUT', 'DELETE']),
-    body('interval').optional().isInt({ min: 30, max: 300 }),
+    body('check_interval').optional().isInt({ min: 30, max: 300 }),
     body('timeout').optional().isInt({ min: 5, max: 60 }),
     body('expected_status').optional().isInt({ min: 100, max: 599 }),
     body('retry_times').optional().isInt({ min: 1, max: 10 }),
@@ -216,7 +216,7 @@ router.post(
         method = 'GET',
         headers = {},
         body = null,
-        interval = 60,
+        check_interval = 60,
         timeout = 10,
         expected_status = 200,
         retry_times = 5,
@@ -252,7 +252,7 @@ router.post(
       await execute(
         `INSERT INTO monitors (
           id, owner_id, name, url, method, headers, body,
-          interval, timeout, expected_status, retry_times, warning_threshold,
+          check_interval, timeout, expected_status, retry_times, warning_threshold,
           status, health_status, consecutive_failures, webhook_id, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 'normal', 0, ?, NOW(), NOW())`,
         [
@@ -263,7 +263,7 @@ router.post(
           method,
           JSON.stringify(headers),
           body,
-          interval,
+          check_interval,
           timeout,
           expected_status,
           retry_times,
@@ -290,7 +290,7 @@ router.put(
     body('name').optional().trim().isLength({ min: 1, max: 50 }),
     body('url').optional().isURL(),
     body('method').optional().isIn(['GET', 'POST', 'PUT', 'DELETE']),
-    body('interval').optional().isInt({ min: 30, max: 300 }),
+    body('check_interval').optional().isInt({ min: 30, max: 300 }),
     body('timeout').optional().isInt({ min: 5, max: 60 }),
     body('expected_status').optional().isInt({ min: 100, max: 599 }),
     body('retry_times').optional().isInt({ min: 1, max: 10 }),
@@ -324,7 +324,7 @@ router.put(
         method,
         headers,
         body,
-        interval,
+        check_interval,
         timeout,
         expected_status,
         retry_times,
@@ -380,9 +380,9 @@ router.put(
         updates.push('body = ?');
         values.push(body);
       }
-      if (interval !== undefined) {
-        updates.push('interval = ?');
-        values.push(interval);
+      if (check_interval !== undefined) {
+        updates.push('check_interval = ?');
+        values.push(check_interval);
       }
       if (timeout !== undefined) {
         updates.push('timeout = ?');

@@ -27,15 +27,58 @@ const pool = mysql.createPool({
   keepAliveInitialDelay: 0,
 });
 
-// Test connection
-pool.getConnection()
-  .then(connection => {
+// Track connection health
+let isHealthy = false;
+let lastError: Error | null = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+
+// Test connection and setup health monitoring
+async function testConnection(): Promise<void> {
+  try {
+    const connection = await pool.getConnection();
     console.log('Database connected successfully');
+    isHealthy = true;
+    lastError = null;
+    reconnectAttempts = 0;
     connection.release();
-  })
-  .catch(err => {
-    console.error('Database connection failed:', err.message);
-  });
+  } catch (err) {
+    isHealthy = false;
+    lastError = err instanceof Error ? err : new Error(String(err));
+    console.error('Database connection failed:', lastError.message);
+    
+    // Attempt reconnection if under max attempts
+    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      reconnectAttempts++;
+      console.log(`Attempting to reconnect... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+      setTimeout(testConnection, 5000 * reconnectAttempts);
+    } else {
+      console.error('Max reconnection attempts reached. Database is unavailable.');
+    }
+  }
+}
+
+// Initial connection test
+testConnection();
+
+// Pool error handling - mysql2/promise pool doesn't have 'error' event in the same way
+// We handle errors per-connection instead
+process.on('unhandledRejection', (reason) => {
+  if (reason instanceof Error && reason.message.includes('database')) {
+    console.error('Unhandled database error:', reason);
+    isHealthy = false;
+    lastError = reason;
+  }
+});
+
+// Health check function
+export function getDbHealth(): { healthy: boolean; lastError: string | null; reconnectAttempts: number } {
+  return {
+    healthy: isHealthy,
+    lastError: lastError?.message || null,
+    reconnectAttempts
+  };
+}
 
 export default pool;
 

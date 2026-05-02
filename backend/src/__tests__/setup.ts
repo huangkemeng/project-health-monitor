@@ -1,14 +1,19 @@
-// Test setup file
 import dotenv from 'dotenv';
 
-// Load test environment variables
+// Load environment variables
 dotenv.config({ path: '.env.test' });
 
-// Mock console methods during tests
+// Set test environment variables
+process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-only-do-not-use-in-production';
+process.env.CRON_SECRET = 'test-cron-secret-for-testing-only';
+process.env.NODE_ENV = 'test';
+
+// Mock console methods to reduce noise during tests
 global.console = {
   ...console,
-  // Uncomment to ignore specific console methods during tests
-  // log: jest.fn(),
-  // error: jest.fn(),
-  // warn: jest.fn(),
+  log: jest.fn(),
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
 };

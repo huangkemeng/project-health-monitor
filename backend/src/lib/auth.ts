@@ -1,10 +1,15 @@
 import { SignJWT, jwtVerify } from 'jose';
 import type { JwtPayload } from '../types';
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production'
-);
+// Validate JWT_SECRET on startup
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+  console.error('ERROR: JWT_SECRET environment variable is not set!');
+  console.error('Please set a secure random string (at least 32 characters) for JWT_SECRET');
+  process.exit(1);
+}
 
+const JWT_SECRET = new TextEncoder().encode(jwtSecret);
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 /**

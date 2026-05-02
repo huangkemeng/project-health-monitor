@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import { query, queryOne, execute } from '../lib/db';
 import { success, error, unauthorized } from '../utils/api-response';
 import type { Monitor, Webhook, Alert, CheckLog, AlertSilence } from '../types';
@@ -28,17 +29,109 @@ function verifyCronSecret(req: any, res: any, next: any) {
   next();
 }
 
+// Cron job execution tracking
+interface CronJobLog {
+  id: string;
+  started_at: Date;
+  ended_at: Date | null;
+  status: 'running' | 'completed' | 'failed';
+  total_monitors: number;
+  success_count: number;
+  failure_count: number;
+  error_message: string | null;
+}
+
+// Initialize cron job tracking table
+async function initCronJobLogTable(): Promise<void> {
+  try {
+    await execute(`
+      CREATE TABLE IF NOT EXISTS cron_job_logs (
+        id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ended_at TIMESTAMP NULL,
+        status VARCHAR(20) DEFAULT 'running',
+        total_monitors INT DEFAULT 0,
+        success_count INT DEFAULT 0,
+        failure_count INT DEFAULT 0,
+        error_message TEXT,
+        INDEX idx_cron_logs_status (status),
+        INDEX idx_cron_logs_started (started_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+  } catch (err) {
+    console.error('Failed to create cron_job_logs table:', err);
+  }
+}
+
+// Initialize table on module load
+initCronJobLogTable();
+
+// Send alert notification for cron job failure
+async function sendCronFailureAlert(errorMessage: string, jobLogId: string): Promise<void> {
+  // Get default webhook for system alerts
+  const webhook = await queryOne<Webhook>(
+    'SELECT * FROM webhooks WHERE is_default = TRUE LIMIT 1'
+  );
+
+  if (!webhook) {
+    console.error('No default webhook configured for cron failure alerts');
+    return;
+  }
+
+  const atContent = webhook.at_users
+    ? webhook.at_users.split(',').map(p => `<@${p.trim()}>`).join(' ')
+    : '';
+
+  const message = {
+    msgtype: 'markdown',
+    markdown: {
+      content: `<font color="warning">【系统告警】Cron 任务执行失败</font>
+
+> **任务类型**: 健康检查定时任务
+> **失败原因**: ${errorMessage}
+> **日志ID**: ${jobLogId}
+> **时间**: ${new Date().toLocaleString('zh-CN')}
+
+请立即检查系统状态！
+${atContent}`
+    }
+  };
+
+  try {
+    const response = await fetch(webhook.webhook_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(message)
+    });
+
+    if (!response.ok) {
+      console.error('Failed to send cron failure alert:', await response.text());
+    }
+  } catch (err) {
+    console.error('Error sending cron failure alert:', err);
+  }
+}
+
 // Run health checks for all active monitors
 router.post('/check', verifyCronSecret, async (req, res) => {
+  const jobId = crypto.randomUUID();
+  const startTime = Date.now();
+
   try {
-    console.log('Starting health check cron job at', new Date().toISOString());
+    console.log(`[${jobId}] Starting health check cron job at`, new Date().toISOString());
+
+    // Create job log entry
+    await execute(
+      `INSERT INTO cron_job_logs (id, status, started_at) VALUES (?, 'running', NOW())`,
+      [jobId]
+    );
 
     // Get all active monitors
     const monitors = await query<Monitor>(
       "SELECT * FROM monitors WHERE status = 'active'"
     );
 
-    console.log(`Found ${monitors.length} active monitors to check`);
+    console.log(`[${jobId}] Found ${monitors.length} active monitors to check`);
 
     const results = {
       total: monitors.length,
@@ -68,7 +161,7 @@ router.post('/check', verifyCronSecret, async (req, res) => {
             }
           }
         } catch (err) {
-          console.error(`Error checking monitor ${monitor.id}:`, err);
+          console.error(`[${jobId}] Error checking monitor ${monitor.id}:`, err);
           results.failure++;
         }
       }));
@@ -77,10 +170,39 @@ router.post('/check', verifyCronSecret, async (req, res) => {
     // Clean up expired silences
     await cleanupExpiredSilences();
 
-    console.log('Health check cron job completed:', results);
-    success(res, results);
+    // Update job log as completed
+    await execute(
+      `UPDATE cron_job_logs 
+       SET status = 'completed', 
+           ended_at = NOW(), 
+           total_monitors = ?, 
+           success_count = ?, 
+           failure_count = ? 
+       WHERE id = ?`,
+      [results.total, results.success, results.failure, jobId]
+    );
+
+    const duration = Date.now() - startTime;
+    console.log(`[${jobId}] Health check cron job completed in ${duration}ms:`, results);
+
+    success(res, { ...results, job_id: jobId, duration_ms: duration });
   } catch (err) {
-    console.error('Cron check error:', err);
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error(`[${jobId}] Cron check error:`, errorMessage);
+
+    // Update job log as failed
+    await execute(
+      `UPDATE cron_job_logs 
+       SET status = 'failed', 
+           ended_at = NOW(), 
+           error_message = ? 
+       WHERE id = ?`,
+      [errorMessage, jobId]
+    );
+
+    // Send failure alert
+    await sendCronFailureAlert(errorMessage, jobId);
+
     error(res, 'Health check failed');
   }
 });

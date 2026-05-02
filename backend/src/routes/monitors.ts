@@ -16,8 +16,18 @@ router.get(
   [
     queryValidator('page').optional().isInt({ min: 1 }),
     queryValidator('page_size').optional().isInt({ min: 1, max: 100 }),
-    queryValidator('status').optional().isIn(['active', 'paused', 'archived']),
-    queryValidator('health_status').optional().isIn(['normal', 'warning', 'critical']),
+    queryValidator('status').optional().custom((value) => {
+      if (value === '' || ['active', 'paused', 'archived'].includes(value)) {
+        return true;
+      }
+      throw new Error('Invalid value');
+    }),
+    queryValidator('health_status').optional().custom((value) => {
+      if (value === '' || ['normal', 'warning', 'critical'].includes(value)) {
+        return true;
+      }
+      throw new Error('Invalid value');
+    }),
     queryValidator('keyword').optional().trim()
   ],
   async (req: Request, res: Response) => {

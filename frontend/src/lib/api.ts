@@ -12,6 +12,7 @@ import {
   CheckLog,
   Alert
 } from '@/types';
+import { emitRateLimitError, emitError } from '@/lib/error-events';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -59,10 +60,15 @@ api.interceptors.response.use(
     } else if (error.response?.status === 429) {
       // Rate limit exceeded - show user-friendly message
       const message = error.response.data?.message || '请求过于频繁，请稍后再试';
+      // Emit global error event
+      emitRateLimitError(message);
       // Create a custom error with the message from backend
       const rateLimitError = new Error(message);
       rateLimitError.name = 'RateLimitError';
       return Promise.reject(rateLimitError);
+    } else if (error.response?.status && error.response.status >= 500) {
+      // Server errors
+      emitError('服务器错误，请稍后重试');
     }
     return Promise.reject(error);
   }

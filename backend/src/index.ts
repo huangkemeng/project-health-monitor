@@ -48,7 +48,7 @@ const authLimiter = rateLimit({
 });
 
 // Trust proxy - required for getting real client IP behind reverse proxy
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(cors({

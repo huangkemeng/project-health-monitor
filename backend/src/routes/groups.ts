@@ -73,7 +73,7 @@ export async function getOrCreateDefaultGroup(userId: string): Promise<Group> {
 // Get all groups for current user
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user!.userId;
 
     // Ensure default group exists
     await getOrCreateDefaultGroup(userId);
@@ -127,7 +127,7 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
 // Get single group by ID
 router.get('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user!.userId;
     const { id } = req.params;
 
     const groups = await query(
@@ -173,7 +173,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
 // Create new group
 router.post('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user!.userId;
     const { name, description, color } = req.body;
 
     // Validation
@@ -254,7 +254,7 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
 // Update group
 router.put('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user!.userId;
     const { id } = req.params;
     const { name, description, color } = req.body;
 
@@ -370,7 +370,7 @@ router.put('/:id', authenticate, async (req: Request, res: Response, next: NextF
 // Delete group
 router.delete('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user!.userId;
     const { id } = req.params;
 
     // Check if group exists and belongs to user
@@ -409,7 +409,7 @@ router.delete('/:id', authenticate, async (req: Request, res: Response, next: Ne
 // Move monitors to group
 router.post('/:id/monitors', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user!.userId;
     const { id } = req.params;
     const { monitor_ids } = req.body;
 
@@ -457,7 +457,7 @@ router.post('/:id/monitors', authenticate, async (req: Request, res: Response, n
 // Get monitors in group
 router.get('/:id/monitors', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user!.userId;
     const { id } = req.params;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;

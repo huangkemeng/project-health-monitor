@@ -1,5 +1,6 @@
 import pool from '../db';
 import { createTablesSQL } from './schema';
+import { addGroupColumn } from './add-group-column';
 
 /**
  * Automatically run database migrations on startup
@@ -74,6 +75,9 @@ export async function autoMigrate(): Promise<void> {
       console.log('  ✓ Database schema is up to date');
     }
     console.log('');
+
+    // Run additional migrations for schema updates
+    await addGroupColumn();
 
   } catch (error) {
     console.error('[DB] Migration failed:', error);

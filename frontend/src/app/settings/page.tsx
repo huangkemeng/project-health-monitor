@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { User, Lock, Mail, Calendar, Save, Shield } from "lucide-react";
+import { User, Lock, Mail, Calendar, Save, Shield, Palette, Monitor, Layout } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { authApi } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
 import { getErrorMessage } from "@/lib/error-handler";
+import { useTheme } from "@/hooks/use-theme";
+import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { themeStyle, setThemeStyle } = useTheme();
   const [passwordData, setPasswordData] = useState({
     old_password: "",
     new_password: "",
@@ -71,7 +74,7 @@ export default function SettingsPage() {
         </div>
 
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+          <TabsList className="grid w-full grid-cols-3 lg:w-[500px]">
             <TabsTrigger value="profile" className="gap-2">
               <User className="h-4 w-4" />
               个人信息
@@ -79,6 +82,10 @@ export default function SettingsPage() {
             <TabsTrigger value="password" className="gap-2">
               <Lock className="h-4 w-4" />
               修改密码
+            </TabsTrigger>
+            <TabsTrigger value="appearance" className="gap-2">
+              <Palette className="h-4 w-4" />
+              外观
             </TabsTrigger>
           </TabsList>
 
@@ -230,6 +237,108 @@ export default function SettingsPage() {
                     </Button>
                   </div>
                 </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Appearance Tab */}
+          <TabsContent value="appearance">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Palette className="h-5 w-5" />
+                  外观设置
+                </CardTitle>
+                <CardDescription>自定义界面主题风格</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <Label>主题风格</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Classic Theme Option */}
+                    <button
+                      onClick={() => setThemeStyle('classic')}
+                      className={cn(
+                        "relative flex flex-col items-start p-4 rounded-lg border-2 text-left transition-all hover:border-primary/50",
+                        themeStyle === 'classic'
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-card"
+                      )}
+                    >
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20">
+                          <Layout className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <div className="font-medium">经典圆润</div>
+                          <div className="text-xs text-muted-foreground">柔和圆角，传统风格</div>
+                        </div>
+                      </div>
+                      <div className="w-full h-16 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 border flex items-center justify-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/20" />
+                        <div className="w-16 h-6 rounded-full bg-secondary" />
+                        <div className="w-6 h-6 rounded-md bg-accent" />
+                      </div>
+                      {themeStyle === 'classic' && (
+                        <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                          <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+                    </button>
+
+                    {/* Linear Theme Option */}
+                    <button
+                      onClick={() => setThemeStyle('linear')}
+                      className={cn(
+                        "relative flex flex-col items-start p-4 rounded-lg border-2 text-left transition-all hover:border-primary/50",
+                        themeStyle === 'linear'
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-card"
+                      )}
+                    >
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 rounded-lg bg-gradient-to-br from-gray-500/20 to-slate-500/20">
+                          <Monitor className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <div className="font-medium">线条现代</div>
+                          <div className="text-xs text-muted-foreground">简洁线条，现代风格</div>
+                        </div>
+                      </div>
+                      <div className="w-full h-16 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 border flex items-center justify-center gap-2">
+                        <div className="w-8 h-8 rounded-sm bg-primary/20" />
+                        <div className="w-16 h-6 rounded-sm bg-secondary" />
+                        <div className="w-6 h-6 rounded-sm bg-accent" />
+                      </div>
+                      {themeStyle === 'linear' && (
+                        <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                          <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="rounded-lg bg-muted p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-1.5 rounded-md bg-primary/10">
+                      <Palette className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">主题预览</p>
+                      <p className="text-xs text-muted-foreground">
+                        当前使用的是 <span className="font-medium text-foreground">{themeStyle === 'classic' ? '经典圆润' : '线条现代'}</span> 风格。
+                        更改会立即生效并保存在本地。
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

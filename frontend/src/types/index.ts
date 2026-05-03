@@ -264,6 +264,8 @@ export interface DashboardStats {
   success_rate_24h: number;
   success_rate?: number;
   avg_response_time_24h: number;
+  total_groups?: number;
+  monitors_with_group?: number;
 }
 
 export interface DashboardMonitorItem {

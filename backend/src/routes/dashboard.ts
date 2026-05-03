@@ -35,6 +35,19 @@ router.get('/', authenticate, async (req, res) => {
       paused: Number(summaryResult[0]?.paused) || 0
     };
 
+    // Get group statistics
+    console.log('[Dashboard] Executing group stats query...');
+    const groupStats = await query<{ total_groups: number; monitors_with_group: number }>(
+      `SELECT
+        COUNT(DISTINCT mg.id) as total_groups,
+        COUNT(DISTINCT m.group_id) as monitors_with_group
+       FROM monitor_groups mg
+       LEFT JOIN monitors m ON mg.id = m.group_id AND m.owner_id = ? AND m.status != 'archived'
+       WHERE mg.owner_id = ?`,
+      [userId, userId]
+    );
+    console.log('[Dashboard] Group stats:', groupStats);
+
     // Get 24h stats from check_logs
     console.log('[Dashboard] Executing 24h stats query...');
     const stats24h = await query<{ total_checks: number; success_checks: number; success_rate: number }>(
@@ -119,7 +132,9 @@ router.get('/', authenticate, async (req, res) => {
         total_checks_24h: totalChecks24h,
         success_rate_24h: successRate24h,
         success_rate: successRate24h,
-        avg_response_time_24h: 0 // TODO: calculate if needed
+        avg_response_time_24h: 0, // TODO: calculate if needed
+        total_groups: Number(groupStats[0]?.total_groups) || 0,
+        monitors_with_group: Number(groupStats[0]?.monitors_with_group) || 0
       }
     };
 

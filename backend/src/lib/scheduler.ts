@@ -158,8 +158,13 @@ async function checkMonitor(monitor: Monitor): Promise<CheckResult> {
     [monitor.id, status, httpCode, responseTime, errorMsg]
   );
 
+  // Calculate new consecutive failures before updating
+  const newConsecutiveFailures = status === 'success' 
+    ? 0 
+    : monitor.consecutive_failures + 1;
+
   // Update monitor status
-  await updateMonitorStatus(monitor, status, responseTime);
+  await updateMonitorStatus(monitor, status, responseTime, newConsecutiveFailures);
 
   // Check for alerts
   const result: CheckResult = {
@@ -168,7 +173,7 @@ async function checkMonitor(monitor: Monitor): Promise<CheckResult> {
   };
 
   if (status === 'failure') {
-    const alertResult = await handleMonitorFailure(monitor, errorMsg);
+    const alertResult = await handleMonitorFailure(monitor, errorMsg, newConsecutiveFailures);
     result.alertTriggered = alertResult.triggered;
     result.alertLevel = alertResult.level;
   } else {
@@ -188,12 +193,9 @@ async function checkMonitor(monitor: Monitor): Promise<CheckResult> {
 async function updateMonitorStatus(
   monitor: Monitor, 
   status: 'success' | 'failure',
-  responseTime: number | null
+  responseTime: number | null,
+  newConsecutiveFailures: number
 ): Promise<void> {
-  const newConsecutiveFailures = status === 'success' 
-    ? 0 
-    : monitor.consecutive_failures + 1;
-
   let healthStatus: 'normal' | 'warning' | 'critical' = 'normal';
   
   if (status === 'success') {
@@ -222,9 +224,10 @@ async function updateMonitorStatus(
 // Handle monitor failure
 async function handleMonitorFailure(
   monitor: Monitor, 
-  errorMsg: string | null
+  errorMsg: string | null,
+  consecutiveFailures: number
 ): Promise<{ triggered: boolean; level: 'warning' | 'critical' }> {
-  const alertLevel = monitor.consecutive_failures >= 2 ? 'critical' : 'warning';
+  const alertLevel = consecutiveFailures >= 3 ? 'critical' : 'warning';
 
   // Check if there's an active silence
   const activeSilence = await queryOne(
@@ -283,7 +286,7 @@ async function handleMonitorSuccess(monitor: Monitor): Promise<void> {
   // Check if there's an active alert to resolve
   const activeAlert = await queryOne<Alert>(
     `SELECT * FROM alerts 
-     WHERE monitor_id = ? AND status = 'active'`,
+     WHERE monitor_id = ? AND status = 'firing'`,
     [monitor.id]
   );
 

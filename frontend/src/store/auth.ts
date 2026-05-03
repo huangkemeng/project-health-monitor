@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist, PersistStorage } from 'zustand/middleware';
 import { User, AuthResponse } from '@/types';
 import { authApi } from '@/lib/api';
 
@@ -19,7 +19,34 @@ interface AuthState {
   clearError: () => void;
 }
 
-// Base store configuration without persist
+// Custom storage that checks rememberMe before persisting
+const createAuthStorage = (): PersistStorage<AuthState> => {
+  return {
+    getItem: (name: string) => {
+      // Always read from localStorage for get
+      const str = localStorage.getItem(name);
+      return str ? JSON.parse(str) : null;
+    },
+    setItem: (name: string, value) => {
+      // Check if rememberMe is enabled before persisting
+      if (value.state?.rememberMe === true) {
+        localStorage.setItem(name, JSON.stringify(value));
+        localStorage.setItem('rememberMe', 'true');
+      } else {
+        // Don't persist, but keep rememberMe flag
+        localStorage.setItem('rememberMe', 'false');
+        // Remove any existing persisted state
+        localStorage.removeItem(name);
+      }
+    },
+    removeItem: (name: string) => {
+      localStorage.removeItem(name);
+      localStorage.removeItem('rememberMe');
+    },
+  };
+};
+
+// Base store configuration
 const createBaseStore = (set: any, get: any) => ({
   user: null,
   token: null,
@@ -56,11 +83,9 @@ const createBaseStore = (set: any, get: any) => ({
         rememberMe,
       });
 
-      // If not remember me, set up session storage only
+      // If not remember me, set up to clear on page unload
       if (!rememberMe) {
-        // Store in sessionStorage instead of localStorage for non-remember me
         sessionStorage.setItem('token', response.token);
-        // We'll clear localStorage token on page unload
         const handleBeforeUnload = () => {
           localStorage.removeItem('token');
           localStorage.removeItem('rememberMe');
@@ -147,20 +172,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => createBaseStore(set, get),
     {
       name: 'auth-storage',
-      storage: createJSONStorage(() => localStorage),
-      partialize: (state) => {
-        // Only persist if remember me was checked
-        const rememberMe = localStorage.getItem('rememberMe') === 'true';
-        if (!rememberMe) {
-          return {}; // Don't persist anything
-        }
-        return {
-          user: state.user,
-          token: state.token,
-          isAuthenticated: state.isAuthenticated,
-          rememberMe: state.rememberMe,
-        };
-      },
+      storage: createAuthStorage(),
     }
   )
 );

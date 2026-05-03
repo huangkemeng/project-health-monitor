@@ -1,12 +1,50 @@
 import { AxiosError } from 'axios';
 
+export interface ApiError {
+  field: string;
+  message: string;
+}
+
 export interface ApiErrorResponse {
   success: false;
   message: string;
   code?: string;
+  errors?: ApiError[];
+}
+
+// Custom API exception
+export class ApiException extends Error {
+  constructor(
+    message: string,
+    public code: number,
+    public errors?: ApiError[]
+  ) {
+    super(message);
+    this.name = 'ApiException';
+  }
 }
 
 export function getErrorMessage(error: unknown): string {
+  // 优先处理 ApiException，获取字段级错误信息
+  if (error instanceof ApiException) {
+    if (error.errors && error.errors.length > 0) {
+      return error.errors.map(e => e.message).join('\n');
+    }
+    return error.message;
+  }
+
+  // 处理 AxiosError，尝试从响应中提取字段级错误
+  if (error && typeof error === 'object' && 'isAxiosError' in error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    const responseData = axiosError.response?.data;
+    if (responseData?.errors && responseData.errors.length > 0) {
+      return responseData.errors.map(e => e.message).join('\n');
+    }
+    if (responseData?.message) {
+      return responseData.message;
+    }
+  }
+  
   if (error instanceof Error) {
     return error.message;
   }
@@ -16,6 +54,19 @@ export function getErrorMessage(error: unknown): string {
   }
   
   return '发生未知错误，请稍后重试';
+}
+
+export function getFieldErrors(error: unknown): ApiError[] | undefined {
+  if (error instanceof ApiException) {
+    return error.errors;
+  }
+
+  if (error && typeof error === 'object' && 'isAxiosError' in error) {
+    const axiosError = error as AxiosError<ApiErrorResponse>;
+    return axiosError.response?.data?.errors;
+  }
+
+  return undefined;
 }
 
 export function isRateLimitError(error: unknown): boolean {

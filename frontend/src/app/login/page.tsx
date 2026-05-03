@@ -48,7 +48,7 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     try {
-      await login(data.username, data.password);
+      await login(data.username, data.password, data.rememberMe);
       handleSuccess("登录成功", "欢迎回来！");
       router.push("/dashboard");
     } catch (err) {

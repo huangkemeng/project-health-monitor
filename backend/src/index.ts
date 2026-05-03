@@ -21,8 +21,8 @@ const PORT = process.env.PORT || 3001;
 
 // Rate limiting middleware
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  windowMs: 60 * 1000, // 1 minute
+  max: 120, // Limit each IP to 120 requests per minute
   message: {
     success: false,
     message: '请求过于频繁，请稍后再试',
@@ -35,7 +35,7 @@ const limiter = rateLimit({
 // Stricter rate limiting for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 login attempts per windowMs
+  max: 20, // Limit each IP to 20 login attempts per 15 minutes
   message: {
     success: false,
     message: '登录尝试次数过多，请15分钟后再试',

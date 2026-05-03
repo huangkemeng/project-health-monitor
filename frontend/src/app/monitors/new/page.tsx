@@ -18,14 +18,6 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { monitorsApi, webhooksApi } from "@/lib/api";
@@ -39,8 +31,7 @@ export default function NewMonitorPage() {
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showUrlConfirm, setShowUrlConfirm] = useState(false);
-  const [urlTestResult, setUrlTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
 
   const [formData, setFormData] = useState({
     name: "",
@@ -82,48 +73,12 @@ export default function NewMonitorPage() {
     }
   };
 
-  const testUrlReachability = async (): Promise<{ success: boolean; message: string }> => {
+  // Simple URL format validation only - actual reachability is tested by backend
+  const validateUrlFormat = (): { success: boolean; message: string } => {
     if (!isSafeUrl(formData.url)) {
-      return { success: false, message: "URL 不安全，仅支持 http:// 或 https:// 协议" };
+      return { success: false, message: "URL 格式不正确，仅支持 http:// 或 https:// 协议" };
     }
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      const fetchOptions: RequestInit = {
-        method: formData.method,
-        signal: controller.signal,
-        headers: {
-          "User-Agent": "ProjectHealthMonitor/1.0",
-          ...safeJsonParse(formData.headers, {}),
-        },
-      };
-
-      if (formData.body && ["POST", "PUT", "PATCH"].includes(formData.method)) {
-        fetchOptions.body = formData.body;
-      }
-
-      const response = await fetch(formData.url, fetchOptions);
-      clearTimeout(timeoutId);
-
-      if (response.status === formData.expected_status) {
-        return { success: true, message: "URL 可访问" };
-      } else {
-        return {
-          success: false,
-          message: `URL 返回状态码 ${response.status}，期望 ${formData.expected_status}`,
-        };
-      }
-    } catch (err) {
-      if (err instanceof Error) {
-        if (err.name === "AbortError") {
-          return { success: false, message: "URL 测试超时（5秒）" };
-        }
-        return { success: false, message: `无法访问: ${err.message}` };
-      }
-      return { success: false, message: "URL 不可达" };
-    }
+    return { success: true, message: "URL 格式正确" };
   };
 
   const safeJsonParse = (json: string, defaultValue: Record<string, string>): Record<string, string> => {
@@ -175,21 +130,14 @@ export default function NewMonitorPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!showUrlConfirm) {
-      const testResult = await testUrlReachability();
-      if (!testResult.success) {
-        setUrlTestResult(testResult);
-        setShowUrlConfirm(true);
-        return;
-      }
+    // Only validate URL format, actual reachability is tested by backend
+    const validationResult = validateUrlFormat();
+    if (!validationResult.success) {
+      setError(validationResult.message);
+      return;
     }
 
     await submitForm();
-  };
-
-  const handleConfirmContinue = () => {
-    setShowUrlConfirm(false);
-    submitForm();
   };
 
   const updateField = (field: string, value: string | number) => {
@@ -258,7 +206,7 @@ export default function NewMonitorPage() {
                   onChange={(e) => updateField("url", e.target.value)}
                   placeholder="https://api.example.com/health"
                 />
-                <p className="text-xs text-muted-foreground">保存前将自动测试 URL 是否可达</p>
+                <p className="text-xs text-muted-foreground">后端将自动检测 URL 是否可达</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -462,28 +410,6 @@ export default function NewMonitorPage() {
           </div>
         </form>
 
-        {/* URL Test Confirmation Dialog */}
-        <Dialog open={showUrlConfirm} onOpenChange={setShowUrlConfirm}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-amber-500" />
-                URL 不可达
-              </DialogTitle>
-              <DialogDescription>
-                {urlTestResult?.message}，是否继续保存？
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowUrlConfirm(false)}>
-                返回修改
-              </Button>
-              <Button onClick={handleConfirmContinue} variant="default">
-                继续保存
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     </MainLayout>
   );

@@ -169,7 +169,12 @@ export default function CheckHistoryPage() {
                     <SelectItem value="all">全部监控项</SelectItem>
                     {monitors.map((monitor) => (
                       <SelectItem key={monitor.id} value={monitor.id}>
-                        {monitor.name}
+                        <span className="flex items-center gap-2">
+                          <span>{monitor.name}</span>
+                          {monitor.group_name && (
+                            <span className="text-gray-400 text-xs">{monitor.group_name}</span>
+                          )}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>

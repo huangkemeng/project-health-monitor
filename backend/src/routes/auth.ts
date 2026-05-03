@@ -163,7 +163,7 @@ router.post(
         return;
       }
 
-      const { username, password } = req.body;
+      const { username, password, remember_me } = req.body;
       const sanitizedUsername = sanitizeString(username);
       const ipAddress = req.ip || req.socket.remoteAddress || null;
 
@@ -212,12 +212,12 @@ router.post(
         [user.id]
       );
 
-      // Generate token
+      // Generate token with remember me option
       const token = await generateToken({
         userId: user.id,
         username: user.username,
         email: user.email
-      });
+      }, remember_me === true);
 
       // Return user without password
       const userResponse: UserResponse = {

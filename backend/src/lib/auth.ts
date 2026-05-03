@@ -10,16 +10,23 @@ if (!jwtSecret) {
 }
 
 const JWT_SECRET = new TextEncoder().encode(jwtSecret);
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h'; // Default: 24 hours for non-remember me
+const JWT_EXPIRES_IN_REMEMBER = process.env.JWT_EXPIRES_IN_REMEMBER || '30d'; // 30 days for remember me
 
 /**
  * Generate JWT token for user
+ * @param payload - User data
+ * @param rememberMe - If true, token expires in 30 days, otherwise 24 hours
  */
-export async function generateToken(payload: { userId: string; username: string; email: string }): Promise<string> {
+export async function generateToken(
+  payload: { userId: string; username: string; email: string },
+  rememberMe: boolean = false
+): Promise<string> {
+  const expirationTime = rememberMe ? JWT_EXPIRES_IN_REMEMBER : JWT_EXPIRES_IN;
   const token = await new SignJWT({ userId: payload.userId, username: payload.username, email: payload.email })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime(JWT_EXPIRES_IN)
+    .setExpirationTime(expirationTime)
     .sign(JWT_SECRET);
 
   return token;

@@ -180,13 +180,12 @@ async function updateMonitorStatus(
 
   await execute(
     `UPDATE monitors 
-     SET last_check = NOW(), 
-         last_status = ?, 
+     SET last_check_at = NOW(), 
          consecutive_failures = ?,
          health_status = ?,
-         response_time = ?
+         last_response_time = ?
      WHERE id = ?`,
-    [status, newConsecutiveFailures, healthStatus, responseTime, monitor.id]
+    [newConsecutiveFailures, healthStatus, responseTime, monitor.id]
   );
 }
 
@@ -200,7 +199,7 @@ async function handleMonitorFailure(
   // Check if there's an active silence
   const activeSilence = await queryOne(
     `SELECT * FROM alert_silences 
-     WHERE monitor_id = ? AND status = 'active' AND expires_at > NOW()`,
+     WHERE monitor_id = ? AND expires_at > NOW()`,
     [monitor.id]
   );
 
@@ -219,9 +218,9 @@ async function handleMonitorFailure(
   if (!existingAlert) {
     // Create new alert
     await execute(
-      `INSERT INTO alerts (id, monitor_id, alert_type, alert_level, message, status, started_at) 
-       VALUES (UUID(), ?, 'failure', ?, ?, 'active', NOW())`,
-      [monitor.id, alertLevel, errorMsg || 'Monitor check failed']
+      `INSERT INTO alerts (id, monitor_id, alert_level, status, started_at) 
+       VALUES (UUID(), ?, ?, 'firing', NOW())`,
+      [monitor.id, alertLevel]
     );
 
     // Send webhook notification
@@ -246,7 +245,7 @@ async function handleMonitorSuccess(monitor: Monitor): Promise<void> {
     // Resolve the alert
     await execute(
       `UPDATE alerts 
-       SET status = 'resolved', resolved_at = NOW() 
+       SET status = 'resolved', ended_at = NOW() 
        WHERE id = ?`,
       [activeAlert.id]
     );
@@ -272,9 +271,9 @@ async function handleResponseTimeWarning(
     const message = `Response time (${responseTime}ms) exceeded warning threshold (${monitor.warning_threshold}ms)`;
     
     await execute(
-      `INSERT INTO alerts (id, monitor_id, alert_type, alert_level, message, status, started_at) 
-       VALUES (UUID(), ?, 'slow_response', 'warning', ?, 'active', NOW())`,
-      [monitor.id, message]
+      `INSERT INTO alerts (id, monitor_id, alert_level, status, started_at) 
+       VALUES (UUID(), ?, 'warning', 'firing', NOW())`,
+      [monitor.id]
     );
 
     await sendAlertNotification(monitor, 'warning', message);
@@ -377,9 +376,8 @@ ${atContent}`
 // Clean up expired silences
 async function cleanupExpiredSilences(): Promise<void> {
   await execute(
-    `UPDATE alert_silences 
-     SET status = 'expired' 
-     WHERE status = 'active' AND expires_at <= NOW()`
+    `DELETE FROM alert_silences 
+     WHERE expires_at <= NOW()`
   );
 }
 

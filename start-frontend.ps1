@@ -23,13 +23,10 @@ if (-not (Test-Path $envFile)) {
     Write-Host "Please copy .env.example to .env.local and configure API address." -ForegroundColor Yellow
 }
 
-# Change to frontend directory
-Set-Location $frontendPath
-
 # Check node_modules
-if (-not (Test-Path "node_modules")) {
+if (-not (Test-Path (Join-Path $frontendPath "node_modules"))) {
     Write-Host "Installing dependencies..." -ForegroundColor Yellow
-    npm install
+    npm install -C $frontendPath
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Dependency installation failed"
         exit 1
@@ -42,5 +39,5 @@ Write-Host "Server will run at http://localhost:3000" -ForegroundColor Gray
 Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Gray
 Write-Host ""
 
-# Start development server
-npm run dev
+# Start development server (without changing directory)
+npm run dev -C $frontendPath

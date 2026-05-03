@@ -179,19 +179,19 @@ async function checkMonitor(monitor: Monitor): Promise<CheckResult> {
 
 // Update monitor status
 async function updateMonitorStatus(
-  monitor: Monitor, 
+  monitor: Monitor,
   status: 'success' | 'failure',
   responseTime: number | null,
   newConsecutiveFailures: number
 ): Promise<void> {
   let healthStatus: 'normal' | 'warning' | 'critical' = 'normal';
-  
+
   if (status === 'success') {
     if (responseTime && responseTime >= monitor.warning_threshold) {
       healthStatus = 'warning';
     }
   } else {
-    if (newConsecutiveFailures >= 3) {
+    if (newConsecutiveFailures >= monitor.retry_times) {
       healthStatus = 'critical';
     } else if (newConsecutiveFailures >= 1) {
       healthStatus = 'warning';
@@ -211,11 +211,11 @@ async function updateMonitorStatus(
 
 // Handle monitor failure
 async function handleMonitorFailure(
-  monitor: Monitor, 
+  monitor: Monitor,
   errorMsg: string | null,
   consecutiveFailures: number
 ): Promise<{ triggered: boolean; level: 'warning' | 'critical' }> {
-  const alertLevel = consecutiveFailures >= 3 ? 'critical' : 'warning';
+  const alertLevel = consecutiveFailures >= monitor.retry_times ? 'critical' : 'warning';
 
   // Check if there's an active silence
   const activeSilence = await queryOne(

@@ -140,6 +140,7 @@ export interface CheckLogResponse {
 // Alert Types
 export type AlertLevel = 'warning' | 'critical';
 export type AlertStatus = 'firing' | 'resolved';
+export type AlertResolvedReason = 'recovered' | 'paused' | 'deleted' | null;
 export type SendStatus = 'pending' | 'sent' | 'failed';
 
 export interface Alert {
@@ -147,6 +148,7 @@ export interface Alert {
   monitor_id: string;
   alert_level: AlertLevel;
   status: AlertStatus;
+  resolved_reason: AlertResolvedReason;
   started_at: Date;
   ended_at: Date | null;
   duration: number | null;
@@ -163,6 +165,7 @@ export interface AlertResponse {
   group_name?: string | null;
   alert_level: AlertLevel;
   status: AlertStatus;
+  resolved_reason: AlertResolvedReason;
   started_at: Date;
   ended_at: Date | null;
   duration: number | null;

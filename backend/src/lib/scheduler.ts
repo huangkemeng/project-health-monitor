@@ -258,10 +258,10 @@ async function handleMonitorSuccess(monitor: Monitor): Promise<void> {
   );
 
   if (activeAlert) {
-    // Resolve the alert
+    // Resolve the alert with reason 'recovered'
     await execute(
       `UPDATE alerts 
-       SET status = 'resolved', ended_at = NOW() 
+       SET status = 'resolved', resolved_reason = 'recovered', ended_at = NOW() 
        WHERE id = ?`,
       [activeAlert.id]
     );

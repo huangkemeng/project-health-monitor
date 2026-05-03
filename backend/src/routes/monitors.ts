@@ -556,10 +556,10 @@ router.post(
         [id]
       );
 
-      // Resolve any active alerts for this monitor
+      // Resolve any active alerts for this monitor with reason 'paused'
       await execute(
         `UPDATE alerts 
-         SET status = 'resolved', ended_at = NOW() 
+         SET status = 'resolved', resolved_reason = 'paused', ended_at = NOW() 
          WHERE monitor_id = ? AND status = 'firing'`,
         [id]
       );

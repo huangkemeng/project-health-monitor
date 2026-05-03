@@ -206,6 +206,7 @@ export interface CheckLogResponse {
 // Alert Types
 export type AlertLevel = 'warning' | 'critical';
 export type AlertStatus = 'firing' | 'resolved';
+export type AlertResolvedReason = 'recovered' | 'paused' | 'deleted' | null;
 export type SendStatus = 'pending' | 'sent' | 'failed';
 
 export interface Alert {
@@ -216,6 +217,7 @@ export interface Alert {
   alert_level: AlertLevel;
   level?: AlertLevel;
   status: AlertStatus;
+  resolved_reason: AlertResolvedReason;
   started_at: string;
   ended_at: string | null;
   resolved_at?: string | null;

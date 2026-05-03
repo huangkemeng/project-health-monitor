@@ -307,7 +307,15 @@ export default function AlertHistoryPage() {
                             ) : (
                               <XCircle className="h-3 w-3" />
                             )}
-                            {alert.status === "resolved" ? "已恢复" : "进行中"}
+                            {alert.status === "resolved"
+                              ? alert.resolved_reason === "recovered"
+                                ? "已恢复"
+                                : alert.resolved_reason === "paused"
+                                ? "已暂停"
+                                : alert.resolved_reason === "deleted"
+                                ? "已删除"
+                                : "已结束"
+                              : "进行中"}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">

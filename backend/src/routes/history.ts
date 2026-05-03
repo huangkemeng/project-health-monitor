@@ -196,6 +196,7 @@ router.get(
         group_name: a.group_name,
         alert_level: a.alert_level,
         status: a.status,
+        resolved_reason: a.resolved_reason,
         started_at: a.started_at,
         ended_at: a.ended_at,
         duration: a.duration,

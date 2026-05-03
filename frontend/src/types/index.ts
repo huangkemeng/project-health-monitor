@@ -51,6 +51,9 @@ export interface Monitor {
   response_time?: number | null;
   webhook_id: string | null;
   webhook_name?: string | null;
+  group_id: string | null;
+  group_name?: string | null;
+  group_color?: string | null;
   total_checks?: number;
   success_checks?: number;
   failed_checks?: number;
@@ -85,6 +88,7 @@ export interface CreateMonitorData {
   warning_threshold?: number;
   critical_threshold?: number;
   webhook_id?: string;
+  group_id?: string;
 }
 
 export interface UpdateMonitorData {
@@ -99,7 +103,51 @@ export interface UpdateMonitorData {
   retry_times?: number;
   warning_threshold?: number;
   webhook_id?: string;
+  group_id?: string;
 }
+
+// Monitor Group Types
+export interface MonitorGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string;
+  is_default: boolean;
+  sort_order: number;
+  monitor_count: number;
+  health_summary: {
+    normal: number;
+    warning: number;
+    critical: number;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateGroupData {
+  name: string;
+  description?: string;
+  color?: string;
+}
+
+export interface UpdateGroupData {
+  name?: string;
+  description?: string;
+  color?: string;
+}
+
+export const GROUP_COLORS = [
+  { value: '#3B82F6', label: '蓝色' },
+  { value: '#10B981', label: '绿色' },
+  { value: '#F59E0B', label: '黄色' },
+  { value: '#EF4444', label: '红色' },
+  { value: '#8B5CF6', label: '紫色' },
+  { value: '#EC4899', label: '粉色' },
+  { value: '#06B6D4', label: '青色' },
+  { value: '#84CC16', label: 'Lime' },
+  { value: '#F97316', label: '橙色' },
+  { value: '#6B7280', label: '灰色' },
+] as const;
 
 // Webhook Types
 export interface Webhook {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Bell, History, Settings, Webhook, X } from "lucide-react";
+import { Activity, Bell, History, Settings, Webhook, X, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +21,7 @@ interface SidebarProps {
 const navItems = [
   { href: "/dashboard", label: "仪表盘", icon: Activity },
   { href: "/monitors", label: "监控项", icon: Bell },
+  { href: "/groups", label: "分组管理", icon: FolderOpen },
   { href: "/history", label: "历史记录", icon: History },
   { href: "/webhooks", label: "Webhook", icon: Webhook },
   { href: "/settings", label: "设置", icon: Settings },

@@ -10,7 +10,9 @@ import {
   CreateMonitorData,
   DashboardData,
   CheckLog,
-  Alert
+  Alert,
+  MonitorGroup,
+  CreateGroupData
 } from '@/types';
 import { emitRateLimitError, emitError } from '@/lib/error-events';
 import { ApiException } from '@/lib/error-handler';
@@ -162,7 +164,7 @@ export const webhooksApi = {
 
 // Monitors API
 export const monitorsApi = {
-  list: (params?: { page?: number; page_size?: number; status?: string; health_status?: string; keyword?: string }, config?: AxiosRequestConfig) =>
+  list: (params?: { page?: number; page_size?: number; status?: string; health_status?: string; keyword?: string; group_id?: string }, config?: AxiosRequestConfig) =>
     apiClient.get<PaginatedResponse<Monitor>>('/monitors', { params, ...config }),
 
   get: (id: string, config?: AxiosRequestConfig) =>
@@ -197,6 +199,30 @@ export const historyApi = {
 
   getAlerts: (params?: { monitor_id?: string; status?: string; start_time?: string; end_time?: string; page?: number; page_size?: number }, config?: AxiosRequestConfig) =>
     apiClient.get<PaginatedResponse<Alert>>('/history/alerts', { params, ...config }),
+};
+
+// Groups API
+export const groupsApi = {
+  list: (config?: AxiosRequestConfig) =>
+    apiClient.get<{ items: MonitorGroup[]; total: number }>('/groups', config),
+
+  get: (id: string, config?: AxiosRequestConfig) =>
+    apiClient.get<MonitorGroup>(`/groups/${id}`, config),
+
+  create: (data: CreateGroupData, config?: AxiosRequestConfig) =>
+    apiClient.post<MonitorGroup>('/groups', data, config),
+
+  update: (id: string, data: Partial<CreateGroupData>, config?: AxiosRequestConfig) =>
+    apiClient.put<MonitorGroup>(`/groups/${id}`, data, config),
+
+  delete: (id: string, config?: AxiosRequestConfig) =>
+    apiClient.delete(`/groups/${id}`, config),
+
+  getMonitors: (id: string, params?: { page?: number; limit?: number }, config?: AxiosRequestConfig) =>
+    apiClient.get<PaginatedResponse<Monitor>>(`/groups/${id}/monitors`, { params, ...config }),
+
+  moveMonitors: (groupId: string, monitorIds: string[], config?: AxiosRequestConfig) =>
+    apiClient.post<{ moved_count: number }>(`/groups/${groupId}/monitors`, { monitor_ids: monitorIds }, config),
 };
 
 export default api;

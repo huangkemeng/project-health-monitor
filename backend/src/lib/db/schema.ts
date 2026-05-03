@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS webhooks (
 CREATE TABLE IF NOT EXISTS monitors (
   id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
   owner_id CHAR(36) NOT NULL,
+  group_id CHAR(36),
   name VARCHAR(50) NOT NULL,
   url VARCHAR(500) NOT NULL,
   method VARCHAR(10) DEFAULT 'GET',
@@ -57,8 +58,10 @@ CREATE TABLE IF NOT EXISTS monitors (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (group_id) REFERENCES monitor_groups(id) ON DELETE SET NULL,
   FOREIGN KEY (webhook_id) REFERENCES webhooks(id) ON DELETE SET NULL,
   INDEX idx_monitors_owner (owner_id),
+  INDEX idx_monitors_group (group_id),
   INDEX idx_monitors_status (status),
   INDEX idx_monitors_health (health_status),
   INDEX idx_monitors_owner_status (owner_id, status)
@@ -137,6 +140,23 @@ CREATE TABLE IF NOT EXISTS cron_job_logs (
   INDEX idx_cron_logs_status (status),
   INDEX idx_cron_logs_started (started_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Monitor groups table (for organizing monitors)
+CREATE TABLE IF NOT EXISTS monitor_groups (
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  owner_id CHAR(36) NOT NULL,
+  name VARCHAR(50) NOT NULL,
+  description VARCHAR(200),
+  color VARCHAR(7) DEFAULT '#3B82F6',
+  sort_order INT DEFAULT 0,
+  is_default BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE KEY uk_owner_group_name (owner_id, name),
+  INDEX idx_groups_owner (owner_id),
+  INDEX idx_groups_sort_order (sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 `;
 
 export const dropTablesSQL = `
@@ -146,6 +166,7 @@ DROP TABLE IF EXISTS alert_silences;
 DROP TABLE IF EXISTS alerts;
 DROP TABLE IF EXISTS check_logs;
 DROP TABLE IF EXISTS monitors;
+DROP TABLE IF EXISTS monitor_groups;
 DROP TABLE IF EXISTS webhooks;
 DROP TABLE IF EXISTS users;
 `;

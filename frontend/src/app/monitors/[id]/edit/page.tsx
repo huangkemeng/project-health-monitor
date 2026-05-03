@@ -7,9 +7,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { monitorsApi, webhooksApi } from '@/lib/api';
-import { Monitor, Webhook, HttpMethod } from '@/types';
-import { ArrowLeft, Loader2, Save, Globe, Settings, Clock, Bell, Webhook as WebhookIcon } from 'lucide-react';
+import { monitorsApi, webhooksApi, groupsApi } from '@/lib/api';
+import { Monitor, Webhook, MonitorGroup, HttpMethod } from '@/types';
+import { ArrowLeft, Loader2, Save, Globe, Settings, Clock, Bell, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +35,7 @@ const editMonitorSchema = z.object({
   retry_times: z.number().min(1).max(10),
   warning_threshold: z.number().min(100).max(60000),
   webhook_id: z.string().optional(),
+  group_id: z.string().optional(),
 });
 
 type EditMonitorForm = z.infer<typeof editMonitorSchema>;
@@ -44,6 +45,7 @@ export default function EditMonitorPage({ params }: { params: { id: string } }) 
   const { toast } = useToast();
   const [monitor, setMonitor] = useState<Monitor | null>(null);
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
+  const [groups, setGroups] = useState<MonitorGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
 
@@ -73,15 +75,17 @@ export default function EditMonitorPage({ params }: { params: { id: string } }) 
     
     const fetchData = async () => {
       try {
-        const [monitorData, webhooksData] = await Promise.all([
+        const [monitorData, webhooksData, groupsData] = await Promise.all([
           monitorsApi.get(params.id),
           webhooksApi.list(),
+          groupsApi.list(),
         ]);
         
         if (!isMounted) return;
         
         setMonitor(monitorData);
         setWebhooks(webhooksData.items);
+        setGroups(groupsData.items);
         
         // Reset form with fetched data - ensure numeric fields are numbers
         reset({
@@ -96,6 +100,7 @@ export default function EditMonitorPage({ params }: { params: { id: string } }) 
           retry_times: Number(monitorData.retry_times) || 5,
           warning_threshold: Number(monitorData.warning_threshold) || 3000,
           webhook_id: monitorData.webhook_id || '',
+          group_id: monitorData.group_id || '',
         });
       } catch (error) {
         console.error('Failed to fetch data:', error);
@@ -144,6 +149,7 @@ export default function EditMonitorPage({ params }: { params: { id: string } }) 
         retry_times: data.retry_times,
         warning_threshold: data.warning_threshold,
         webhook_id: data.webhook_id || undefined,
+        group_id: data.group_id || undefined,
       });
 
       toast({
@@ -267,6 +273,39 @@ export default function EditMonitorPage({ params }: { params: { id: string } }) 
                     {...register('expected_status', { valueAsNumber: true })}
                   />
                 </div>
+              </div>
+
+              {/* Group Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="group_id">所属分组</Label>
+                <Select
+                  value={watch('group_id') || 'none'}
+                  onValueChange={(value) => setValue('group_id', value === 'none' ? '' : value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择分组" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">未分组</SelectItem>
+                    {groups.map((group) => (
+                      <SelectItem key={group.id} value={group.id}>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: group.color }}
+                          />
+                          {group.name}
+                          {group.is_default && ' (默认)'}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  <Link href="/groups" className="text-primary hover:underline">
+                    管理分组
+                  </Link>
+                </p>
               </div>
             </CardContent>
           </Card>

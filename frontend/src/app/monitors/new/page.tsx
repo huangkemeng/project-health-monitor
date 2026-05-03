@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, AlertTriangle, Plus, Globe, Clock, Bell, Settings } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Plus, Globe, Clock, Bell, Settings, FolderOpen } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,8 +21,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/error-handler";
-import { monitorsApi, webhooksApi } from "@/lib/api";
-import { Webhook, HttpMethod } from "@/types";
+import { monitorsApi, webhooksApi, groupsApi } from "@/lib/api";
+import { Webhook, HttpMethod, MonitorGroup } from "@/types";
 
 const HTTP_METHODS: HttpMethod[] = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
 
@@ -30,9 +30,9 @@ export default function NewMonitorPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
+  const [groups, setGroups] = useState<MonitorGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
 
   const [formData, setFormData] = useState({
     name: "",
@@ -47,6 +47,7 @@ export default function NewMonitorPage() {
     warning_threshold: 3000,
     critical_threshold: 5000,
     webhook_id: "",
+    group_id: "",
   });
 
   useEffect(() => {
@@ -62,7 +63,23 @@ export default function NewMonitorPage() {
         console.error("Failed to fetch webhooks:", error);
       }
     };
+
+    const fetchGroups = async () => {
+      try {
+        const response = await groupsApi.list();
+        setGroups(response.items);
+        // Set default group if exists
+        const defaultGroup = response.items.find((g) => g.is_default);
+        if (defaultGroup) {
+          setFormData((prev) => ({ ...prev, group_id: defaultGroup.id }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch groups:", error);
+      }
+    };
+
     fetchWebhooks();
+    fetchGroups();
   }, []);
 
   const isSafeUrl = (url: string): boolean => {
@@ -117,6 +134,7 @@ export default function NewMonitorPage() {
         warning_threshold: formData.warning_threshold,
         critical_threshold: formData.critical_threshold,
         webhook_id: formData.webhook_id || undefined,
+        group_id: formData.group_id || undefined,
       });
 
       toast({ title: "监控项创建成功", variant: "success" });
@@ -241,6 +259,39 @@ export default function NewMonitorPage() {
                     onChange={(e) => updateField("expected_status", parseInt(e.target.value))}
                   />
                 </div>
+              </div>
+
+              {/* Group Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="group_id">所属分组</Label>
+                <Select
+                  value={formData.group_id || "none"}
+                  onValueChange={(value) => updateField("group_id", value === "none" ? "" : value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择分组" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">未分组</SelectItem>
+                    {groups.map((group) => (
+                      <SelectItem key={group.id} value={group.id}>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: group.color }}
+                          />
+                          {group.name}
+                          {group.is_default && " (默认)"}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  <Link href="/groups" className="text-primary hover:underline">
+                    管理分组
+                  </Link>
+                </p>
               </div>
             </CardContent>
           </Card>

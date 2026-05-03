@@ -11,6 +11,7 @@ import { startScheduler, stopScheduler } from './lib/scheduler';
 import authRoutes from './routes/auth';
 import webhookRoutes from './routes/webhooks';
 import monitorRoutes from './routes/monitors';
+import groupRoutes from './routes/groups';
 import dashboardRoutes from './routes/dashboard';
 import historyRoutes from './routes/history';
 import cronRoutes from './routes/cron';
@@ -122,6 +123,7 @@ app.get('/health/detailed', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/monitors', monitorRoutes);
+app.use('/api/groups', groupRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/cron', cronRoutes);

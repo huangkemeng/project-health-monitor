@@ -28,6 +28,7 @@ router.get(
       }
       throw new Error('Invalid value');
     }),
+    queryValidator('group_id').optional().trim(),
     queryValidator('keyword').optional().trim()
   ],
   async (req: Request, res: Response) => {
@@ -42,6 +43,7 @@ router.get(
       const pageSize = parseInt(req.query.page_size as string) || 20;
       const status = req.query.status as string;
       const healthStatus = req.query.health_status as string;
+      const groupId = req.query.group_id as string;
       const keyword = req.query.keyword as string;
 
       const offset = (page - 1) * pageSize;
@@ -58,6 +60,11 @@ router.get(
       if (healthStatus) {
         conditions.push('m.health_status = ?');
         values.push(healthStatus);
+      }
+
+      if (groupId) {
+        conditions.push('m.group_id = ?');
+        values.push(groupId);
       }
 
       if (keyword) {
@@ -79,9 +86,10 @@ router.get(
 
       // Get monitors
       const monitors = await query<Monitor>(
-        `SELECT m.*, w.name as webhook_name
+        `SELECT m.*, w.name as webhook_name, g.name as group_name, g.color as group_color
          FROM monitors m
          LEFT JOIN webhooks w ON m.webhook_id = w.id
+         LEFT JOIN monitor_groups g ON m.group_id = g.id
          WHERE ${whereClause}
          ORDER BY m.created_at DESC
          LIMIT ? OFFSET ?`,
@@ -210,7 +218,8 @@ router.post(
     body('timeout').optional().isInt({ min: 5, max: 60 }),
     body('expected_status').optional().isInt({ min: 100, max: 599 }),
     body('retry_times').optional().isInt({ min: 1, max: 10 }),
-    body('warning_threshold').optional().isInt({ min: 1000, max: 30000 })
+    body('warning_threshold').optional().isInt({ min: 1000, max: 30000 }),
+    body('group_id').optional().trim()
   ],
   async (req: Request, res: Response) => {
     try {
@@ -231,7 +240,8 @@ router.post(
         expected_status = 200,
         retry_times = 5,
         warning_threshold = 3000,
-        webhook_id
+        webhook_id,
+        group_id
       } = req.body;
 
       // Validate URL format
@@ -258,16 +268,35 @@ router.post(
         }
       }
 
+      // Validate group_id if provided
+      let finalGroupId = group_id;
+      if (group_id) {
+        const group = await queryOne(
+          'SELECT * FROM monitor_groups WHERE id = ? AND owner_id = ?',
+          [group_id, req.user!.userId]
+        );
+        if (!group) {
+          validationError(res, [{ field: 'group_id', message: '分组不存在' }]);
+          return;
+        }
+      } else {
+        // Get or create default group
+        const { getOrCreateDefaultGroup } = await import('./groups');
+        const defaultGroup = await getOrCreateDefaultGroup(req.user!.userId);
+        finalGroupId = defaultGroup.id;
+      }
+
       const monitorId = uuidv4();
       await execute(
         `INSERT INTO monitors (
-          id, owner_id, name, url, method, headers, body,
+          id, owner_id, group_id, name, url, method, headers, body,
           check_interval, timeout, expected_status, retry_times, warning_threshold,
           status, health_status, consecutive_failures, webhook_id, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 'normal', 0, ?, NOW(), NOW())`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 'normal', 0, ?, NOW(), NOW())`,
         [
           monitorId,
           req.user!.userId,
+          finalGroupId,
           sanitizeString(name),
           url,
           method,
@@ -304,7 +333,8 @@ router.put(
     body('timeout').optional().isInt({ min: 5, max: 60 }),
     body('expected_status').optional().isInt({ min: 100, max: 599 }),
     body('retry_times').optional().isInt({ min: 1, max: 10 }),
-    body('warning_threshold').optional().isInt({ min: 1000, max: 30000 })
+    body('warning_threshold').optional().isInt({ min: 1000, max: 30000 }),
+    body('group_id').optional().trim()
   ],
   async (req: Request, res: Response) => {
     try {
@@ -339,7 +369,8 @@ router.put(
         expected_status,
         retry_times,
         warning_threshold,
-        webhook_id
+        webhook_id,
+        group_id
       } = req.body;
 
       // Validate URL if provided
@@ -362,6 +393,18 @@ router.put(
         );
         if (!webhook) {
           validationError(res, [{ field: 'webhook_id', message: 'Webhook 不存在' }]);
+          return;
+        }
+      }
+
+      // Validate group_id if provided
+      if (group_id) {
+        const group = await queryOne(
+          'SELECT * FROM monitor_groups WHERE id = ? AND owner_id = ?',
+          [group_id, userId]
+        );
+        if (!group) {
+          validationError(res, [{ field: 'group_id', message: '分组不存在' }]);
           return;
         }
       }
@@ -413,6 +456,10 @@ router.put(
       if (webhook_id !== undefined) {
         updates.push('webhook_id = ?');
         values.push(webhook_id || null);
+      }
+      if (group_id !== undefined) {
+        updates.push('group_id = ?');
+        values.push(group_id || null);
       }
 
       values.push(id);

@@ -1,6 +1,7 @@
 import pool from '../db';
 import { createTablesSQL } from './schema';
 import { addGroupColumn } from './add-group-column';
+import { addResolvedReasonColumn } from './add-resolved-reason-column';
 
 /**
  * Automatically run database migrations on startup
@@ -78,6 +79,7 @@ export async function autoMigrate(): Promise<void> {
 
     // Run additional migrations for schema updates
     await addGroupColumn();
+    await addResolvedReasonColumn();
 
   } catch (error) {
     console.error('[DB] Migration failed:', error);

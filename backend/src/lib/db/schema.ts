@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS alerts (
   monitor_id CHAR(36) NOT NULL,
   alert_level VARCHAR(20) NOT NULL,
   status VARCHAR(20) DEFAULT 'firing',
+  resolved_reason ENUM('recovered', 'paused', 'deleted') NULL,
   started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   ended_at TIMESTAMP NULL,
   duration INT,

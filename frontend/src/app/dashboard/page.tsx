@@ -187,14 +187,14 @@ function AlertList({ alerts, loading, totalAlerts = 0 }: { alerts: Alert[]; load
           key={alert.id}
           className={cn(
             "p-4 rounded-lg border",
-            alert.level === "critical"
+            alert.alert_level === "critical"
               ? "bg-red-50/50 border-red-200"
               : "bg-amber-50/50 border-amber-200"
           )}
         >
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2 flex-wrap">
-              {alert.level === "critical" ? (
+              {alert.alert_level === "critical" ? (
                 <AlertCircle className="h-4 w-4 text-red-500" />
               ) : (
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
@@ -207,10 +207,10 @@ function AlertList({ alerts, loading, totalAlerts = 0 }: { alerts: Alert[]; load
               )}
             </div>
             <Badge
-              variant={alert.level === "critical" ? "destructive" : "warning"}
+              variant={alert.alert_level === "critical" ? "destructive" : "warning"}
               className="text-xs"
             >
-              {alert.level === "critical" ? "严重" : "警告"}
+              {alert.alert_level === "critical" ? "严重" : "警告"}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-2">{alert.message}</p>

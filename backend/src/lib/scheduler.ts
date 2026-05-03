@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { query, queryOne, execute } from './db';
-import type { Monitor, Webhook, Alert } from '../types';
+import type { Monitor, Webhook, Alert, Group } from '../types';
 
 // Cron secret from environment
 const CRON_SECRET = process.env.CRON_SECRET || '';
@@ -285,17 +285,26 @@ async function handleResponseTimeWarning(
 
 // Send alert notification
 async function sendAlertNotification(
-  monitor: Monitor, 
-  level: 'warning' | 'critical', 
+  monitor: Monitor,
+  level: 'warning' | 'critical',
   message: string
 ): Promise<void> {
-  const webhook = monitor.webhook_id 
+  const webhook = monitor.webhook_id
     ? await queryOne<Webhook>('SELECT * FROM webhooks WHERE id = ?', [monitor.webhook_id])
     : await queryOne<Webhook>('SELECT * FROM webhooks WHERE is_default = TRUE LIMIT 1');
 
   if (!webhook) {
     console.log(`[Scheduler] No webhook configured for monitor ${monitor.id}`);
     return;
+  }
+
+  // Get group name if monitor belongs to a group
+  let groupName = '未分组';
+  if (monitor.group_id) {
+    const group = await queryOne<Group>('SELECT name FROM monitor_groups WHERE id = ?', [monitor.group_id]);
+    if (group) {
+      groupName = group.name;
+    }
   }
 
   const color = level === 'critical' ? 'red' : 'warning';
@@ -309,6 +318,7 @@ async function sendAlertNotification(
       content: `<font color="${color}">【${level === 'critical' ? '严重告警' : '警告'}】${monitor.name}</font>
 
 > **监控项**: ${monitor.name}
+> **所属分组**: ${groupName}
 > **告警级别**: ${level === 'critical' ? '严重' : '警告'}
 > **告警类型**: 服务异常
 > **详细信息**: ${message}
@@ -337,11 +347,20 @@ ${atContent}`
 
 // Send recovery notification
 async function sendRecoveryNotification(monitor: Monitor): Promise<void> {
-  const webhook = monitor.webhook_id 
+  const webhook = monitor.webhook_id
     ? await queryOne<Webhook>('SELECT * FROM webhooks WHERE id = ?', [monitor.webhook_id])
     : await queryOne<Webhook>('SELECT * FROM webhooks WHERE is_default = TRUE LIMIT 1');
 
   if (!webhook) return;
+
+  // Get group name if monitor belongs to a group
+  let groupName = '未分组';
+  if (monitor.group_id) {
+    const group = await queryOne<Group>('SELECT name FROM monitor_groups WHERE id = ?', [monitor.group_id]);
+    if (group) {
+      groupName = group.name;
+    }
+  }
 
   const atContent = webhook.at_users
     ? webhook.at_users.split(',').map((p: string) => `<@${p.trim()}>`).join(' ')
@@ -353,6 +372,7 @@ async function sendRecoveryNotification(monitor: Monitor): Promise<void> {
       content: `<font color="info">【恢复通知】${monitor.name}</font>
 
 > **监控项**: ${monitor.name}
+> **所属分组**: ${groupName}
 > **状态**: 已恢复正常
 > **时间**: ${new Date().toLocaleString('zh-CN')}
 > **URL**: ${monitor.url}

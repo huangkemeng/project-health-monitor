@@ -40,6 +40,7 @@ export interface Monitor {
   last_check_at: Date | null;
   last_response_time: number | null;
   webhook_id: string | null;
+  group_id: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -74,6 +75,19 @@ export interface MonitorStats {
   failed_checks: number;
   success_rate: number;
   avg_response_time: number;
+}
+
+// Group Types
+export interface Group {
+  id: string;
+  owner_id: string;
+  name: string;
+  description: string | null;
+  color: string;
+  is_default: boolean;
+  sort_order: number;
+  created_at: Date;
+  updated_at: Date;
 }
 
 // Webhook Types

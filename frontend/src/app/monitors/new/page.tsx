@@ -386,14 +386,14 @@ export default function NewMonitorPage() {
                 <div className="space-y-2">
                   <Label htmlFor="webhook_id">告警 Webhook</Label>
                   <Select
-                    value={formData.webhook_id}
-                    onValueChange={(value) => updateField("webhook_id", value)}
+                    value={formData.webhook_id || "none"}
+                    onValueChange={(value) => updateField("webhook_id", value === "none" ? "" : value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="不发送告警" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">不发送告警</SelectItem>
+                      <SelectItem value="none">不发送告警</SelectItem>
                       {webhooks.map((webhook) => (
                         <SelectItem key={webhook.id} value={webhook.id}>
                           {webhook.name} {webhook.is_default && "(默认)"}

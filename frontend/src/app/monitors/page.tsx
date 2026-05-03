@@ -275,31 +275,31 @@ export default function MonitorsPage() {
               </div>
               <div className="flex gap-2">
                 <Select
-                  value={filters.status}
+                  value={filters.status || "all"}
                   onValueChange={(value) =>
-                    setFilters((prev) => ({ ...prev, status: value }))
+                    setFilters((prev) => ({ ...prev, status: value === "all" ? "" : value }))
                   }
                 >
                   <SelectTrigger className="w-[140px]">
                     <SelectValue placeholder="状态" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部状态</SelectItem>
+                    <SelectItem value="all">全部状态</SelectItem>
                     <SelectItem value="active">运行中</SelectItem>
                     <SelectItem value="paused">已暂停</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select
-                  value={filters.health_status}
+                  value={filters.health_status || "all"}
                   onValueChange={(value) =>
-                    setFilters((prev) => ({ ...prev, health_status: value }))
+                    setFilters((prev) => ({ ...prev, health_status: value === "all" ? "" : value }))
                   }
                 >
                   <SelectTrigger className="w-[140px]">
                     <SelectValue placeholder="健康状态" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部健康</SelectItem>
+                    <SelectItem value="all">全部健康</SelectItem>
                     <SelectItem value="normal">正常</SelectItem>
                     <SelectItem value="warning">警告</SelectItem>
                     <SelectItem value="critical">严重</SelectItem>

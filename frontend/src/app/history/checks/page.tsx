@@ -214,6 +214,7 @@ export default function CheckHistoryPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>监控项</TableHead>
+                    <TableHead>分组</TableHead>
                     <TableHead>状态</TableHead>
                     <TableHead>HTTP 状态码</TableHead>
                     <TableHead>响应时间</TableHead>
@@ -225,7 +226,7 @@ export default function CheckHistoryPage() {
                   {loading ? (
                     [...Array(5)].map((_, i) => (
                       <TableRow key={i}>
-                        <TableCell colSpan={6}>
+                        <TableCell colSpan={7}>
                           <Skeleton className="h-8" />
                         </TableCell>
                       </TableRow>
@@ -233,7 +234,7 @@ export default function CheckHistoryPage() {
                   ) : checks.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={7}
                         className="text-center py-12 text-muted-foreground"
                       >
                         <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -244,7 +245,16 @@ export default function CheckHistoryPage() {
                     checks.map((check) => (
                       <TableRow key={check.id} className="hover:bg-muted/50">
                         <TableCell className="font-medium">
-                          {getMonitorName(check.monitor_id)}
+                          {check.monitor_name || getMonitorName(check.monitor_id)}
+                        </TableCell>
+                        <TableCell>
+                          {check.group_name ? (
+                            <Badge variant="outline" className="text-xs">
+                              {check.group_name}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge

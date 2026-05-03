@@ -62,7 +62,7 @@ router.get('/', authenticate, async (req, res) => {
     );
     console.log('[Dashboard] 24h stats:', stats24h);
 
-    // Get recent alerts
+    // Get recent alerts (limit 5) and total count
     console.log('[Dashboard] Executing alerts query...');
     const recentAlerts = await query<Alert & { monitor_name: string }>(
       `SELECT a.*, m.name as monitor_name
@@ -74,6 +74,16 @@ router.get('/', authenticate, async (req, res) => {
       [userId]
     );
     console.log('[Dashboard] Alerts result count:', recentAlerts.length);
+
+    // Get total alerts count
+    const totalAlertsResult = await query<{ total: number }>(
+      `SELECT COUNT(*) as total
+       FROM alerts a
+       JOIN monitors m ON a.monitor_id = m.id
+       WHERE m.owner_id = ?`,
+      [userId]
+    );
+    const totalAlerts = Number(totalAlertsResult[0]?.total) || 0;
 
     const alertsResponse: AlertResponse[] = recentAlerts.map(a => ({
       id: a.id,
@@ -123,6 +133,7 @@ router.get('/', authenticate, async (req, res) => {
     const dashboardData: DashboardData = {
       summary,
       recent_alerts: alertsResponse,
+      total_alerts: totalAlerts,
       items: monitorItems,
       stats: {
         total_monitors: summary.total,

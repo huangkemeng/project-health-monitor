@@ -72,20 +72,23 @@ router.get(
       );
       const total = countResult?.total || 0;
 
-      // Get check logs
-      const logs = await query<CheckLog & { monitor_name: string }>(
-        `SELECT cl.*, m.name as monitor_name
+      // Get check logs with group info
+      const logs = await query<CheckLog & { monitor_name: string; group_name: string | null }>(
+        `SELECT cl.*, m.name as monitor_name, mg.name as group_name
          FROM check_logs cl
          JOIN monitors m ON cl.monitor_id = m.id
+         LEFT JOIN monitor_groups mg ON m.group_id = mg.id
          WHERE ${whereClause}
          ORDER BY cl.checked_at DESC
          LIMIT ? OFFSET ?`,
         [...values, pageSize, offset]
       );
 
-      const response: CheckLogResponse[] = logs.map((l: CheckLog & { monitor_name: string }) => ({
+      const response: CheckLogResponse[] = logs.map((l: CheckLog & { monitor_name: string; group_name: string | null }) => ({
         id: l.id,
         monitor_id: l.monitor_id,
+        monitor_name: l.monitor_name,
+        group_name: l.group_name,
         status: l.status,
         http_code: l.http_code,
         response_time: l.response_time,
@@ -174,21 +177,23 @@ router.get(
       );
       const total = countResult?.total || 0;
 
-      // Get alerts
-      const alerts = await query<Alert & { monitor_name: string }>(
-        `SELECT a.*, m.name as monitor_name
+      // Get alerts with group info
+      const alerts = await query<Alert & { monitor_name: string; group_name: string | null }>(
+        `SELECT a.*, m.name as monitor_name, mg.name as group_name
          FROM alerts a
          JOIN monitors m ON a.monitor_id = m.id
+         LEFT JOIN monitor_groups mg ON m.group_id = mg.id
          WHERE ${whereClause}
          ORDER BY a.started_at DESC
          LIMIT ? OFFSET ?`,
         [...values, pageSize, offset]
       );
 
-      const response: AlertResponse[] = alerts.map((a: Alert & { monitor_name: string }) => ({
+      const response: AlertResponse[] = alerts.map((a: Alert & { monitor_name: string; group_name: string | null }) => ({
         id: a.id,
         monitor_id: a.monitor_id,
         monitor_name: a.monitor_name,
+        group_name: a.group_name,
         alert_level: a.alert_level,
         status: a.status,
         started_at: a.started_at,

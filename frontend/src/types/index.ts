@@ -182,6 +182,8 @@ export type CheckStatus = 'success' | 'failure';
 export interface CheckLog {
   id: string;
   monitor_id: string;
+  monitor_name?: string;
+  group_name?: string | null;
   status: CheckStatus;
   http_code: number | null;
   response_time: number;
@@ -193,6 +195,7 @@ export interface CheckLogResponse {
   id: string;
   monitor_id: string;
   monitor_name: string;
+  group_name?: string | null;
   status: CheckStatus;
   http_code: number | null;
   response_time: number;
@@ -209,6 +212,7 @@ export interface Alert {
   id: string;
   monitor_id: string;
   monitor_name: string;
+  group_name?: string | null;
   alert_level: AlertLevel;
   level?: AlertLevel;
   status: AlertStatus;
@@ -294,6 +298,7 @@ export interface DashboardData {
   monitors?: DashboardMonitorItem[];
   recent_monitors?: DashboardMonitorItem[];
   recent_alerts?: Alert[];
+  total_alerts?: number;
 }
 
 export interface ResponseTimeData {

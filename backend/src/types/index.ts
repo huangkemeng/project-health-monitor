@@ -128,6 +128,8 @@ export interface CheckLog {
 export interface CheckLogResponse {
   id: string;
   monitor_id: string;
+  monitor_name?: string;
+  group_name?: string | null;
   status: CheckStatus;
   http_code: number | null;
   response_time: number | null;
@@ -158,6 +160,7 @@ export interface AlertResponse {
   id: string;
   monitor_id: string;
   monitor_name?: string;
+  group_name?: string | null;
   alert_level: AlertLevel;
   status: AlertStatus;
   started_at: Date;
@@ -224,6 +227,7 @@ export interface DashboardStats {
 export interface DashboardData {
   summary: DashboardSummary;
   recent_alerts: AlertResponse[];
+  total_alerts?: number;
   items: DashboardMonitorItem[];
   stats: DashboardStats;
 }

@@ -12,6 +12,8 @@ import {
   ArrowRight,
   TrendingUp,
   Clock,
+  FolderOpen,
+  Layers,
 } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -152,7 +154,7 @@ function MonitorList({ monitors, loading }: { monitors: DashboardMonitorItem[]; 
   );
 }
 
-function AlertList({ alerts, loading }: { alerts: Alert[]; loading: boolean }) {
+function AlertList({ alerts, loading, totalAlerts = 0 }: { alerts: Alert[]; loading: boolean; totalAlerts?: number }) {
   if (loading) {
     return (
       <div className="space-y-3">
@@ -207,6 +209,14 @@ function AlertList({ alerts, loading }: { alerts: Alert[]; loading: boolean }) {
           </p>
         </div>
       ))}
+      {totalAlerts > alerts.length && (
+        <Button asChild variant="ghost" className="w-full mt-2">
+          <Link href="/history/alerts">
+            查看更多 ({totalAlerts - alerts.length} 条)
+            <ArrowRight className="h-4 w-4 ml-1" />
+          </Link>
+        </Button>
+      )}
     </div>
   );
 }
@@ -260,10 +270,13 @@ export default function DashboardPage() {
     critical_monitors: summary?.critical || 0,
     total_checks_24h: 0,
     success_rate: 0,
+    total_groups: 0,
+    monitors_with_group: 0,
   };
 
   const monitors = data?.items || [];
   const alerts = data?.recent_alerts || [];
+  const totalAlerts = data?.total_alerts || 0;
 
   return (
     <MainLayout>
@@ -296,7 +309,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <StatCard
             title="总监控项"
             value={stats.total_monitors}
@@ -324,6 +337,20 @@ export default function DashboardPage() {
             description="需要立即处理"
             icon={<AlertCircle className="h-4 w-4" />}
             variant="danger"
+          />
+          <StatCard
+            title="分组数"
+            value={stats.total_groups || 0}
+            description={`${stats.monitors_with_group || 0} 个监控项已分组`}
+            icon={<FolderOpen className="h-4 w-4" />}
+            variant="default"
+          />
+          <StatCard
+            title="未分组"
+            value={stats.total_monitors - (stats.monitors_with_group || 0)}
+            description="建议进行分类管理"
+            icon={<Layers className="h-4 w-4" />}
+            variant="default"
           />
         </div>
 
@@ -355,7 +382,7 @@ export default function DashboardPage() {
               <CardDescription>需要关注的异常</CardDescription>
             </CardHeader>
             <CardContent>
-              <AlertList alerts={alerts} loading={loading} />
+              <AlertList alerts={alerts} loading={loading} totalAlerts={totalAlerts} />
             </CardContent>
           </Card>
         </div>

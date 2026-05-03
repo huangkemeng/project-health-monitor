@@ -251,6 +251,7 @@ export default function AlertHistoryPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>监控项</TableHead>
+                    <TableHead>分组</TableHead>
                     <TableHead>级别</TableHead>
                     <TableHead>状态</TableHead>
                     <TableHead>开始时间</TableHead>
@@ -263,7 +264,7 @@ export default function AlertHistoryPage() {
                   {loading ? (
                     [...Array(5)].map((_, i) => (
                       <TableRow key={i}>
-                        <TableCell colSpan={7}>
+                        <TableCell colSpan={8}>
                           <Skeleton className="h-8" />
                         </TableCell>
                       </TableRow>
@@ -271,7 +272,7 @@ export default function AlertHistoryPage() {
                   ) : alerts.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={7}
+                        colSpan={8}
                         className="text-center py-12 text-muted-foreground"
                       >
                         <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -282,7 +283,16 @@ export default function AlertHistoryPage() {
                     alerts.map((alert) => (
                       <TableRow key={alert.id} className="hover:bg-muted/50">
                         <TableCell className="font-medium">
-                          {getMonitorName(alert.monitor_id)}
+                          {alert.monitor_name || getMonitorName(alert.monitor_id)}
+                        </TableCell>
+                        <TableCell>
+                          {alert.group_name ? (
+                            <Badge variant="outline" className="text-xs">
+                              {alert.group_name}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <AlertLevelBadge level={alert.alert_level} />

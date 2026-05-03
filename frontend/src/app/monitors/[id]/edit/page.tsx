@@ -83,18 +83,18 @@ export default function EditMonitorPage({ params }: { params: { id: string } }) 
         setMonitor(monitorData);
         setWebhooks(webhooksData.items);
         
-        // Reset form with fetched data
+        // Reset form with fetched data - ensure numeric fields are numbers
         reset({
           name: monitorData.name,
           url: monitorData.url,
           method: monitorData.method,
           headers: JSON.stringify(monitorData.headers || {}, null, 2),
           body: monitorData.body || '',
-          interval: monitorData.interval,
-          timeout: monitorData.timeout,
-          expected_status: monitorData.expected_status,
-          retry_times: monitorData.retry_times,
-          warning_threshold: monitorData.warning_threshold,
+          interval: Number(monitorData.interval) || 60,
+          timeout: Number(monitorData.timeout) || 10,
+          expected_status: Number(monitorData.expected_status) || 200,
+          retry_times: Number(monitorData.retry_times) || 5,
+          warning_threshold: Number(monitorData.warning_threshold) || 3000,
           webhook_id: monitorData.webhook_id || '',
         });
       } catch (error) {

@@ -198,14 +198,11 @@ export default function MonitorsPage() {
       setMonitors(response.items);
       setPagination(response.pagination);
     } catch (err) {
-      toast({
-        title: "获取监控列表失败",
-        variant: "destructive",
-      });
+      console.error("Failed to fetch monitors:", err);
     } finally {
       setLoading(false);
     }
-  }, [status, health_status, keyword, page, page_size, toast]);
+  }, [status, health_status, keyword, page, page_size]);
 
   // Only fetch when specific dependencies change, not the entire filters object
   useEffect(() => {

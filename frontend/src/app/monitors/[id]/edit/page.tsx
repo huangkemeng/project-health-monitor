@@ -49,6 +49,7 @@ export default function EditMonitorPage({ params }: { params: { id: string } }) 
   const {
     register,
     handleSubmit,
+    reset,
     setValue,
     watch,
     formState: { errors },
@@ -67,40 +68,49 @@ export default function EditMonitorPage({ params }: { params: { id: string } }) 
   const method = watch('method');
 
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchData = async () => {
       try {
         const [monitorData, webhooksData] = await Promise.all([
           monitorsApi.get(params.id),
           webhooksApi.list(),
         ]);
+        
+        if (!isMounted) return;
+        
         setMonitor(monitorData);
         setWebhooks(webhooksData.items);
         
-        // Set form values
-        setValue('name', monitorData.name);
-        setValue('url', monitorData.url);
-        setValue('method', monitorData.method);
-        setValue('headers', JSON.stringify(monitorData.headers || {}, null, 2));
-        setValue('body', monitorData.body || '');
-        setValue('interval', monitorData.interval);
-        setValue('timeout', monitorData.timeout);
-        setValue('expected_status', monitorData.expected_status);
-        setValue('retry_times', monitorData.retry_times);
-        setValue('warning_threshold', monitorData.warning_threshold);
-        setValue('webhook_id', monitorData.webhook_id || '');
+        // Reset form with fetched data
+        reset({
+          name: monitorData.name,
+          url: monitorData.url,
+          method: monitorData.method,
+          headers: JSON.stringify(monitorData.headers || {}, null, 2),
+          body: monitorData.body || '',
+          interval: monitorData.interval,
+          timeout: monitorData.timeout,
+          expected_status: monitorData.expected_status,
+          retry_times: monitorData.retry_times,
+          warning_threshold: monitorData.warning_threshold,
+          webhook_id: monitorData.webhook_id || '',
+        });
       } catch (error) {
         console.error('Failed to fetch data:', error);
-        toast({
-          title: '获取数据失败',
-          description: '无法加载监控项数据',
-          variant: 'destructive',
-        });
       } finally {
-        setFetchLoading(false);
+        if (isMounted) {
+          setFetchLoading(false);
+        }
       }
     };
+    
     fetchData();
-  }, [params.id, setValue, toast]);
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [params.id, reset]);
 
   const onSubmit = async (data: EditMonitorForm) => {
     setLoading(true);

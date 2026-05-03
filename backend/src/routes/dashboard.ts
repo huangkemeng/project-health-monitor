@@ -18,8 +18,8 @@ router.get('/', authenticate, async (req, res) => {
       `SELECT
         COUNT(*) as total,
         SUM(CASE WHEN health_status = 'normal' AND status = 'active' THEN 1 ELSE 0 END) as normal,
-        SUM(CASE WHEN health_status = 'warning' THEN 1 ELSE 0 END) as warning,
-        SUM(CASE WHEN health_status = 'critical' THEN 1 ELSE 0 END) as critical,
+        SUM(CASE WHEN health_status = 'warning' AND status = 'active' THEN 1 ELSE 0 END) as warning,
+        SUM(CASE WHEN health_status = 'critical' AND status = 'active' THEN 1 ELSE 0 END) as critical,
         SUM(CASE WHEN status = 'paused' THEN 1 ELSE 0 END) as paused
        FROM monitors
        WHERE owner_id = ? AND status != 'archived'`,
@@ -34,19 +34,6 @@ router.get('/', authenticate, async (req, res) => {
       critical: Number(summaryResult[0]?.critical) || 0,
       paused: Number(summaryResult[0]?.paused) || 0
     };
-
-    // Get group statistics
-    console.log('[Dashboard] Executing group stats query...');
-    const groupStats = await query<{ total_groups: number; monitors_with_group: number }>(
-      `SELECT
-        COUNT(DISTINCT mg.id) as total_groups,
-        COUNT(DISTINCT m.group_id) as monitors_with_group
-       FROM monitor_groups mg
-       LEFT JOIN monitors m ON mg.id = m.group_id AND m.owner_id = ? AND m.status != 'archived'
-       WHERE mg.owner_id = ?`,
-      [userId, userId]
-    );
-    console.log('[Dashboard] Group stats:', groupStats);
 
     // Get 24h stats from check_logs
     console.log('[Dashboard] Executing 24h stats query...');
@@ -64,10 +51,11 @@ router.get('/', authenticate, async (req, res) => {
 
     // Get recent alerts (limit 3) and total count
     console.log('[Dashboard] Executing alerts query...');
-    const recentAlerts = await query<Alert & { monitor_name: string }>(
-      `SELECT a.*, m.name as monitor_name
+    const recentAlerts = await query<Alert & { monitor_name: string; group_name: string | null }>(
+      `SELECT a.*, m.name as monitor_name, mg.name as group_name
        FROM alerts a
        JOIN monitors m ON a.monitor_id = m.id
+       LEFT JOIN monitor_groups mg ON m.group_id = mg.id
        WHERE m.owner_id = ?
        ORDER BY a.started_at DESC
        LIMIT 3`,
@@ -89,6 +77,7 @@ router.get('/', authenticate, async (req, res) => {
       id: a.id,
       monitor_id: a.monitor_id,
       monitor_name: a.monitor_name,
+      group_name: a.group_name,
       alert_level: a.alert_level,
       status: a.status,
       started_at: a.started_at,
@@ -98,18 +87,20 @@ router.get('/', authenticate, async (req, res) => {
       created_at: a.created_at
     }));
 
-    // Get active monitors with latest status
+    // Get active monitors with latest status and group info
     console.log('[Dashboard] Executing monitors query...');
-    const monitors = await query<Monitor>(
-      `SELECT * FROM monitors
-       WHERE owner_id = ? AND status = 'active'
+    const monitors = await query<Monitor & { group_name: string | null }>(
+      `SELECT m.*, mg.name as group_name
+       FROM monitors m
+       LEFT JOIN monitor_groups mg ON m.group_id = mg.id
+       WHERE m.owner_id = ? AND m.status = 'active'
        ORDER BY
-         CASE health_status
+         CASE m.health_status
            WHEN 'critical' THEN 1
            WHEN 'warning' THEN 2
            WHEN 'normal' THEN 3
          END,
-         last_check_at DESC`,
+         m.last_check_at DESC`,
       [userId]
     );
     console.log('[Dashboard] Monitors result count:', monitors.length);
@@ -120,7 +111,8 @@ router.get('/', authenticate, async (req, res) => {
       url: m.url,
       health_status: m.health_status,
       last_check_at: m.last_check_at,
-      last_response_time: m.last_response_time
+      last_response_time: m.last_response_time,
+      group_name: m.group_name
     }));
 
     // Build stats object for frontend
@@ -143,9 +135,7 @@ router.get('/', authenticate, async (req, res) => {
         total_checks_24h: totalChecks24h,
         success_rate_24h: successRate24h,
         success_rate: successRate24h,
-        avg_response_time_24h: 0, // TODO: calculate if needed
-        total_groups: Number(groupStats[0]?.total_groups) || 0,
-        monitors_with_group: Number(groupStats[0]?.monitors_with_group) || 0
+        avg_response_time_24h: 0 // TODO: calculate if needed
       }
     };
 

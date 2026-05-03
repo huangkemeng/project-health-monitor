@@ -209,9 +209,9 @@ async function handleMonitorFailure(
   }
 
   // Check if there's already an active alert
-  const existingAlert = await queryOne(
+  const existingAlert = await queryOne<Alert>(
     `SELECT * FROM alerts 
-     WHERE monitor_id = ? AND status = 'active'`,
+     WHERE monitor_id = ? AND status = 'firing'`,
     [monitor.id]
   );
 
@@ -227,6 +227,22 @@ async function handleMonitorFailure(
     await sendAlertNotification(monitor, alertLevel, errorMsg || 'Monitor check failed');
 
     return { triggered: true, level: alertLevel };
+  }
+
+  // Check if alert level should be upgraded (warning -> critical)
+  if (existingAlert.alert_level === 'warning' && alertLevel === 'critical') {
+    // Upgrade existing alert to critical
+    await execute(
+      `UPDATE alerts 
+       SET alert_level = 'critical' 
+       WHERE id = ?`,
+      [existingAlert.id]
+    );
+
+    // Send webhook notification for critical alert
+    await sendAlertNotification(monitor, 'critical', errorMsg || 'Monitor check failed (upgraded to critical)');
+
+    return { triggered: true, level: 'critical' };
   }
 
   return { triggered: false, level: alertLevel };

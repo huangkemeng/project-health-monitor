@@ -12,8 +12,6 @@ import {
   ArrowRight,
   TrendingUp,
   Clock,
-  FolderOpen,
-  Layers,
 } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -126,9 +124,16 @@ function MonitorList({ monitors, loading }: { monitors: DashboardMonitorItem[]; 
           <div className="flex items-center gap-3">
             <StatusDot status={monitor.health_status} />
             <div>
-              <p className="font-medium group-hover:text-primary transition-colors">
-                {monitor.name}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="font-medium group-hover:text-primary transition-colors">
+                  {monitor.name}
+                </p>
+                {monitor.group_name && (
+                  <Badge variant="outline" className="text-xs">
+                    {monitor.group_name}
+                  </Badge>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground">{monitor.url}</p>
             </div>
           </div>
@@ -188,13 +193,18 @@ function AlertList({ alerts, loading, totalAlerts = 0 }: { alerts: Alert[]; load
           )}
         >
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {alert.level === "critical" ? (
                 <AlertCircle className="h-4 w-4 text-red-500" />
               ) : (
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
               )}
               <span className="font-medium">{alert.monitor_name}</span>
+              {alert.group_name && (
+                <Badge variant="outline" className="text-xs">
+                  {alert.group_name}
+                </Badge>
+              )}
             </div>
             <Badge
               variant={alert.level === "critical" ? "destructive" : "warning"}
@@ -270,8 +280,6 @@ export default function DashboardPage() {
     critical_monitors: summary?.critical || 0,
     total_checks_24h: 0,
     success_rate: 0,
-    total_groups: 0,
-    monitors_with_group: 0,
   };
 
   const monitors = data?.items || [];
@@ -309,7 +317,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="总监控项"
             value={stats.total_monitors}
@@ -337,20 +345,6 @@ export default function DashboardPage() {
             description="需要立即处理"
             icon={<AlertCircle className="h-4 w-4" />}
             variant="danger"
-          />
-          <StatCard
-            title="分组数"
-            value={stats.total_groups || 0}
-            description={`${stats.monitors_with_group || 0} 个监控项已分组`}
-            icon={<FolderOpen className="h-4 w-4" />}
-            variant="default"
-          />
-          <StatCard
-            title="未分组"
-            value={stats.total_monitors - (stats.monitors_with_group || 0)}
-            description="建议进行分类管理"
-            icon={<Layers className="h-4 w-4" />}
-            variant="default"
           />
         </div>
 

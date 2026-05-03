@@ -268,8 +268,6 @@ export interface DashboardStats {
   success_rate_24h: number;
   success_rate?: number;
   avg_response_time_24h: number;
-  total_groups?: number;
-  monitors_with_group?: number;
 }
 
 export interface DashboardMonitorItem {
@@ -281,6 +279,7 @@ export interface DashboardMonitorItem {
   last_check_at: string | null;
   last_response_time: number | null;
   response_time?: number | null;
+  group_name?: string | null;
 }
 
 export interface DashboardSummary {

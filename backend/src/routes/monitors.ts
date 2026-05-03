@@ -556,6 +556,14 @@ router.post(
         [id]
       );
 
+      // Resolve any active alerts for this monitor
+      await execute(
+        `UPDATE alerts 
+         SET status = 'resolved', ended_at = NOW() 
+         WHERE monitor_id = ? AND status = 'firing'`,
+        [id]
+      );
+
       success(res, { message: '监控已暂停' });
     } catch (err) {
       console.error('Pause monitor error:', err);

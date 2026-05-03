@@ -49,36 +49,42 @@ function WebhookCard({
   onDelete: (id: string) => void;
 }) {
   return (
-    <Card className="group hover:shadow-md transition-all">
+    <Card className="group hover:shadow-md transition-all overflow-hidden">
       <CardContent className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-4">
-            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Webhook className="h-6 w-6 text-primary" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold truncate">{webhook.name}</h3>
-                {webhook.is_default && (
-                  <Badge variant="secondary" className="gap-1">
-                    <Star className="h-3 w-3 fill-current" />
-                    默认
-                  </Badge>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground truncate max-w-md">
-                {webhook.webhook_url}
-              </p>
-              {webhook.at_users && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  @成员: {webhook.at_users}
-                </p>
+        <div className="flex items-start gap-4">
+          {/* Icon */}
+          <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <Webhook className="h-6 w-6 text-primary" />
+          </div>
+          
+          {/* Content - takes remaining space */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="font-semibold truncate">{webhook.name}</h3>
+              {webhook.is_default && (
+                <Badge variant="secondary" className="gap-1 flex-shrink-0">
+                  <Star className="h-3 w-3 fill-current" />
+                  默认
+                </Badge>
               )}
             </div>
+            <p 
+              className="text-sm text-muted-foreground break-all line-clamp-2" 
+              title={webhook.webhook_url}
+            >
+              {webhook.webhook_url}
+            </p>
+            {webhook.at_users && (
+              <p className="text-xs text-muted-foreground mt-1 truncate">
+                @成员: {webhook.at_users}
+              </p>
+            )}
           </div>
+          
+          {/* Actions - fixed width */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>

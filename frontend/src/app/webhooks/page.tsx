@@ -77,7 +77,7 @@ function WebhookCard({
             </p>
             {webhook.at_users && (
               <p className="text-xs text-muted-foreground mt-1 truncate">
-                @成员: {webhook.at_users}
+                @成员UserID: {webhook.at_users}
               </p>
             )}
           </div>

@@ -95,16 +95,16 @@ export default function NewWebhookPage() {
             </div>
 
             <div>
-              <label className="label">@成员手机号</label>
+              <label className="label">@成员UserID</label>
               <input
                 type="text"
                 className="input"
                 value={formData.at_users}
                 onChange={(e) => setFormData({ ...formData, at_users: e.target.value })}
-                placeholder="13800138000,13800138001"
+                placeholder="zhangsan,lisi,wangwu"
               />
               <p className="mt-1 text-xs text-gray-500">
-                多个手机号用逗号分隔，告警时会@这些成员
+                多个UserID用逗号分隔，告警时会@这些成员。UserID是企业微信成员的唯一标识
               </p>
             </div>
 

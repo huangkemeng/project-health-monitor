@@ -133,14 +133,17 @@ export default function EditWebhookPage({ params }: { params: { id: string } }) 
             </div>
 
             <div>
-              <label className="label">@成员手机号</label>
+              <label className="label">@成员UserID</label>
               <input
                 type="text"
                 className="input"
                 value={formData.at_users}
                 onChange={(e) => setFormData({ ...formData, at_users: e.target.value })}
-                placeholder="13800138000,13800138001"
+                placeholder="zhangsan,lisi,wangwu"
               />
+              <p className="mt-1 text-xs text-gray-500">
+                多个UserID用逗号分隔。UserID是企业微信成员的唯一标识
+              </p>
             </div>
 
             <div className="flex items-center">

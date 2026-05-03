@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { authApi } from "@/lib/api";
+import { getErrorMessage } from "@/lib/error-handler";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -79,7 +80,7 @@ export default function RegisterPage() {
       });
       router.push("/login");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "注册失败");
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }

@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { getErrorMessage } from "@/lib/error-handler";
 import { monitorsApi, webhooksApi } from "@/lib/api";
 import { Webhook, HttpMethod } from "@/types";
 
@@ -121,7 +122,7 @@ export default function NewMonitorPage() {
       toast({ title: "监控项创建成功", variant: "success" });
       router.push("/monitors");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "创建失败");
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

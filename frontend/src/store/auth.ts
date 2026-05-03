@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, PersistStorage } from 'zustand/middleware';
 import { User, AuthResponse } from '@/types';
 import { authApi } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-handler';
 
 interface AuthState {
   user: User | null;
@@ -93,7 +94,7 @@ const createBaseStore = (set: any, get: any) => ({
         window.addEventListener('beforeunload', handleBeforeUnload);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : '登录失败';
+      const message = getErrorMessage(error) || '登录失败';
       set({ isLoading: false, error: message });
       throw error;
     }
@@ -110,7 +111,7 @@ const createBaseStore = (set: any, get: any) => ({
       });
       set({ isLoading: false });
     } catch (error) {
-      const message = error instanceof Error ? error.message : '注册失败';
+      const message = getErrorMessage(error) || '注册失败';
       set({ isLoading: false, error: message });
       throw error;
     }

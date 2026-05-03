@@ -36,6 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { getErrorMessage } from "@/lib/error-handler";
 import { webhooksApi } from "@/lib/api";
 import { Webhook as WebhookType } from "@/types";
 
@@ -151,7 +152,7 @@ export default function WebhooksPage() {
     } catch (error) {
       toast({
         title: "测试失败",
-        description: error instanceof Error ? error.message : "未知错误",
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }

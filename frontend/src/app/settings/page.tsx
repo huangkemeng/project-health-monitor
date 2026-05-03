@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { authApi } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/error-handler";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -49,7 +50,7 @@ export default function SettingsPage() {
       toast({ title: "密码修改成功", variant: "success" });
       setPasswordData({ old_password: "", new_password: "", confirm_password: "" });
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "密码修改失败";
+      const errorMsg = getErrorMessage(err);
       setMessage({ type: "error", text: errorMsg });
     } finally {
       setLoading(false);

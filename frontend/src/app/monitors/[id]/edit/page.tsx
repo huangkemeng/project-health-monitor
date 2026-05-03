@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import { getErrorMessage } from '@/lib/error-handler';
 
 const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 
@@ -154,7 +155,7 @@ export default function EditMonitorPage({ params }: { params: { id: string } }) 
     } catch (err) {
       toast({
         title: '保存失败',
-        description: err instanceof Error ? err.message : '更新失败',
+        description: getErrorMessage(err),
         variant: 'destructive',
       });
     } finally {

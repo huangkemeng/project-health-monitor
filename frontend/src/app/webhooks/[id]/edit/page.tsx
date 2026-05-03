@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { webhooksApi } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-handler';
 import { Webhook } from '@/types';
 import { ArrowLeft } from 'lucide-react';
 
@@ -57,7 +58,7 @@ export default function EditWebhookPage({ params }: { params: { id: string } }) 
       await webhooksApi.update(params.id, formData);
       router.push('/webhooks');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '更新失败');
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

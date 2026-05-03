@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { webhooksApi } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-handler';
 import { ArrowLeft } from 'lucide-react';
 
 export default function NewWebhookPage() {
@@ -34,7 +35,7 @@ export default function NewWebhookPage() {
       await webhooksApi.create(formData);
       router.push('/webhooks');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '创建失败');
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

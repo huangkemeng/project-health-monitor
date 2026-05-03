@@ -90,6 +90,10 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
             error: null,
           });
+          // Redirect to login page immediately
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+          }
         }
       },
 

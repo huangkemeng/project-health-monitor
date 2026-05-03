@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Bell, Menu, User, LogOut, Settings } from "lucide-react";
+import { Activity, Bell, Menu, User, LogOut, Settings, History, Webhook } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,8 +23,8 @@ interface HeaderProps {
 const navItems = [
   { href: "/dashboard", label: "仪表盘", icon: Activity },
   { href: "/monitors", label: "监控项", icon: Bell },
-  { href: "/history", label: "历史记录", icon: Activity },
-  { href: "/webhooks", label: "Webhook", icon: Settings },
+  { href: "/history", label: "历史记录", icon: History },
+  { href: "/webhooks", label: "Webhook", icon: Webhook },
 ];
 
 export function Header({ onMenuClick }: HeaderProps) {

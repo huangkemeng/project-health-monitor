@@ -237,15 +237,19 @@ export default function DashboardPage() {
     }
   }, [fetchData]);
 
+  // Initial load
   useEffect(() => {
     loadData();
+  }, []); // Only run once on mount
 
+  // Auto refresh every 60 seconds (increased from 30s to reduce server load)
+  useEffect(() => {
     const interval = setInterval(() => {
-      loadData(false);
-    }, 30000);
+      fetchData();
+    }, 60000);
 
     return () => clearInterval(interval);
-  }, [loadData]);
+  }, [fetchData]);
 
   const stats = data?.stats || {
     total_monitors: 0,

@@ -59,15 +59,17 @@ export function isValidWebhookUrl(url: string): boolean {
 }
 
 /**
- * Validate phone numbers (for @users)
+ * Validate user IDs (for @users in webhooks)
+ * UserID can contain letters, numbers, underscores, hyphens, and dots
  */
-export function isValidPhoneNumbers(phones: string): boolean {
-  if (!phones || phones.trim() === '') {
+export function isValidPhoneNumbers(userIds: string): boolean {
+  if (!userIds || userIds.trim() === '') {
     return true; // Empty is valid (optional field)
   }
-  const phoneRegex = /^1[3-9]\d{9}$/;
-  const phoneList = phones.split(',').map(p => p.trim());
-  return phoneList.every(phone => phoneRegex.test(phone));
+  // UserID format: letters, numbers, underscores, hyphens, dots (common in enterprise systems)
+  const userIdRegex = /^[a-zA-Z0-9_.\-@]+$/;
+  const userIdList = userIds.split(',').map(p => p.trim()).filter(p => p !== '');
+  return userIdList.every(userId => userIdRegex.test(userId));
 }
 
 /**

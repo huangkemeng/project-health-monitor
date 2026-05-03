@@ -133,9 +133,9 @@ router.post(
         return;
       }
 
-      // Validate phone numbers
+      // Validate user IDs
       if (at_users && !isValidPhoneNumbers(at_users)) {
-        validationError(res, [{ field: 'at_users', message: '手机号格式不正确' }]);
+        validationError(res, [{ field: 'at_users', message: 'UserID 格式不正确，只能包含字母、数字、下划线、横线和点' }]);
         return;
       }
 
@@ -202,9 +202,9 @@ router.put(
         return;
       }
 
-      // Validate phone numbers if provided
+      // Validate user IDs if provided
       if (at_users && !isValidPhoneNumbers(at_users)) {
-        validationError(res, [{ field: 'at_users', message: '手机号格式不正确' }]);
+        validationError(res, [{ field: 'at_users', message: 'UserID 格式不正确，只能包含字母、数字、下划线、横线和点' }]);
         return;
       }
 

@@ -47,10 +47,14 @@ async function sendCronFailureAlert(errorMessage: string, jobLogId: string): Pro
   }
   mentionedList.push(...individualUsers);
 
-  // For Feishu/Lark: <@userid> format in markdown
-  const atContent = individualUsers.length > 0
-    ? individualUsers.map(p => `<@${p}>`).join(' ')
-    : '';
+  // Build @ mention content for message body
+  // WeChat Work needs @all or @userid in the text content to trigger mention
+  let atMentionContent = '';
+  if (hasAll) {
+    atMentionContent = '@all';
+  } else if (individualUsers.length > 0) {
+    atMentionContent = individualUsers.map(u => `@${u}`).join(' ');
+  }
 
   // Use markdown for all platforms (supports color and @mentions)
   const message = {
@@ -63,8 +67,7 @@ async function sendCronFailureAlert(errorMessage: string, jobLogId: string): Pro
 > **日志ID**: ${jobLogId}
 > **时间**: ${new Date().toLocaleString('zh-CN')}
 
-请立即检查系统状态！
-${atContent}`
+请立即检查系统状态！${atMentionContent ? ' ' + atMentionContent : ''}`
     },
     // WeChat Work specific: mentioned_list for @all and userids
     ...(mentionedList.length > 0 && {
@@ -358,10 +361,14 @@ async function sendAlertNotification(
   }
   mentionedList.push(...individualUsers);
 
-  // For Feishu/Lark: <@userid> format in markdown
-  const atContent = individualUsers.length > 0
-    ? individualUsers.map(p => `<@${p}>`).join(' ')
-    : '';
+  // Build @ mention content for message body
+  // WeChat Work needs @all or @userid in the text content to trigger mention
+  let atMentionContent = '';
+  if (hasAll) {
+    atMentionContent = '@all';
+  } else if (individualUsers.length > 0) {
+    atMentionContent = individualUsers.map(u => `@${u}`).join(' ');
+  }
 
   // Use markdown for all platforms (supports color and @mentions)
   const alertMessage = {
@@ -376,8 +383,7 @@ async function sendAlertNotification(
 > **时间**: ${new Date().toLocaleString('zh-CN')}
 > **URL**: ${monitor.url}
 
-请尽快检查！
-${atContent}`
+请尽快检查！${atMentionContent ? ' ' + atMentionContent : ''}`
     },
     // WeChat Work specific: mentioned_list for @all and userids
     ...(mentionedList.length > 0 && {
@@ -429,10 +435,14 @@ async function sendRecoveryNotification(monitor: Monitor): Promise<void> {
   }
   mentionedList.push(...individualUsers);
 
-  // For Feishu/Lark: <@userid> format in markdown
-  const atContent = individualUsers.length > 0
-    ? individualUsers.map(p => `<@${p}>`).join(' ')
-    : '';
+  // Build @ mention content for message body
+  // WeChat Work needs @all or @userid in the text content to trigger mention
+  let atMentionContent = '';
+  if (hasAll) {
+    atMentionContent = '@all';
+  } else if (individualUsers.length > 0) {
+    atMentionContent = individualUsers.map(u => `@${u}`).join(' ');
+  }
 
   // Use markdown for all platforms (supports color and @mentions)
   const recoveryMessage = {
@@ -446,8 +456,7 @@ async function sendRecoveryNotification(monitor: Monitor): Promise<void> {
 > **时间**: ${new Date().toLocaleString('zh-CN')}
 > **URL**: ${monitor.url}
 
-服务已恢复正常！
-${atContent}`
+服务已恢复正常！${atMentionContent ? ' ' + atMentionContent : ''}`
     },
     // WeChat Work specific: mentioned_list for @all and userids
     ...(mentionedList.length > 0 && {

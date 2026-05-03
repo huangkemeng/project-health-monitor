@@ -62,7 +62,7 @@ router.get('/', authenticate, async (req, res) => {
     );
     console.log('[Dashboard] 24h stats:', stats24h);
 
-    // Get recent alerts (limit 5) and total count
+    // Get recent alerts (limit 3) and total count
     console.log('[Dashboard] Executing alerts query...');
     const recentAlerts = await query<Alert & { monitor_name: string }>(
       `SELECT a.*, m.name as monitor_name
@@ -70,7 +70,7 @@ router.get('/', authenticate, async (req, res) => {
        JOIN monitors m ON a.monitor_id = m.id
        WHERE m.owner_id = ?
        ORDER BY a.started_at DESC
-       LIMIT 5`,
+       LIMIT 3`,
       [userId]
     );
     console.log('[Dashboard] Alerts result count:', recentAlerts.length);

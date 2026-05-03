@@ -35,6 +35,20 @@ router.get('/', authenticate, async (req, res) => {
       paused: Number(summaryResult[0]?.paused) || 0
     };
 
+    // Get 24h stats from check_logs
+    console.log('[Dashboard] Executing 24h stats query...');
+    const stats24h = await query<{ total_checks: number; success_checks: number; success_rate: number }>(
+      `SELECT
+        COUNT(*) as total_checks,
+        SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_checks,
+        ROUND(SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) / COUNT(*) * 100, 1) as success_rate
+       FROM check_logs
+       WHERE monitor_id IN (SELECT id FROM monitors WHERE owner_id = ?)
+         AND checked_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`,
+      [userId]
+    );
+    console.log('[Dashboard] 24h stats:', stats24h);
+
     // Get recent alerts
     console.log('[Dashboard] Executing alerts query...');
     const recentAlerts = await query<Alert & { monitor_name: string }>(
@@ -86,10 +100,27 @@ router.get('/', authenticate, async (req, res) => {
       last_response_time: m.last_response_time
     }));
 
+    // Build stats object for frontend
+    const totalChecks24h = Number(stats24h[0]?.total_checks) || 0;
+    const successChecks24h = Number(stats24h[0]?.success_checks) || 0;
+    const successRate24h = totalChecks24h > 0 
+      ? Math.round((successChecks24h / totalChecks24h) * 100) 
+      : 0;
+
     const dashboardData: DashboardData = {
       summary,
       recent_alerts: alertsResponse,
-      items: monitorItems
+      items: monitorItems,
+      stats: {
+        total_monitors: summary.total,
+        active_monitors: summary.total - summary.paused,
+        warning_monitors: summary.warning,
+        critical_monitors: summary.critical,
+        total_checks_24h: totalChecks24h,
+        success_rate_24h: successRate24h,
+        success_rate: successRate24h,
+        avg_response_time_24h: 0 // TODO: calculate if needed
+      }
     };
 
     success(res, dashboardData);

@@ -194,10 +194,22 @@ export interface DashboardMonitorItem {
   last_response_time: number | null;
 }
 
+export interface DashboardStats {
+  total_monitors: number;
+  active_monitors: number;
+  warning_monitors: number;
+  critical_monitors: number;
+  total_checks_24h: number;
+  success_rate_24h: number;
+  success_rate?: number;
+  avg_response_time_24h: number;
+}
+
 export interface DashboardData {
   summary: DashboardSummary;
   recent_alerts: AlertResponse[];
   items: DashboardMonitorItem[];
+  stats: DashboardStats;
 }
 
 // JWT Payload

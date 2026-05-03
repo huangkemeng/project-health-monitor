@@ -223,15 +223,25 @@ export interface DashboardMonitorItem {
   name: string;
   url: string;
   health_status: HealthStatus;
-  status: MonitorStatus;
+  status?: MonitorStatus;
   last_check_at: string | null;
   last_response_time: number | null;
   response_time?: number | null;
 }
 
+export interface DashboardSummary {
+  total: number;
+  normal: number;
+  warning: number;
+  critical: number;
+  paused: number;
+}
+
 export interface DashboardData {
-  stats: DashboardStats;
-  monitors: DashboardMonitorItem[];
+  summary: DashboardSummary;
+  stats?: DashboardStats;
+  items: DashboardMonitorItem[];
+  monitors?: DashboardMonitorItem[];
   recent_monitors?: DashboardMonitorItem[];
   recent_alerts?: Alert[];
 }

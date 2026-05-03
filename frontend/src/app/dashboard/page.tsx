@@ -251,16 +251,18 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [fetchData]);
 
+  // Map backend data to frontend format
+  const summary = data?.summary;
   const stats = data?.stats || {
-    total_monitors: 0,
-    active_monitors: 0,
-    warning_monitors: 0,
-    critical_monitors: 0,
+    total_monitors: summary?.total || 0,
+    active_monitors: (summary?.total || 0) - (summary?.paused || 0),
+    warning_monitors: summary?.warning || 0,
+    critical_monitors: summary?.critical || 0,
     total_checks_24h: 0,
     success_rate: 0,
   };
 
-  const monitors = data?.recent_monitors || [];
+  const monitors = data?.items || [];
   const alerts = data?.recent_alerts || [];
 
   return (

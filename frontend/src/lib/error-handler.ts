@@ -87,7 +87,9 @@ export function isRateLimitError(error: unknown): boolean {
 export function isAuthError(error: unknown): boolean {
   if (typeof error === 'object' && error !== null) {
     const axiosError = error as AxiosError;
-    return axiosError.response?.status === 401;
+    // 排除登录接口的 401 错误（用户名或密码错误），只处理 token 过期的 401
+    const isLoginEndpoint = axiosError.config?.url?.includes('/auth/login');
+    return axiosError.response?.status === 401 && !isLoginEndpoint;
   }
   return false;
 }

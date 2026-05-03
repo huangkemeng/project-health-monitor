@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { monitorsApi } from "@/lib/api";
-import { Monitor, HealthStatus } from "@/types";
+import { Monitor, MonitorResponse, HealthStatus } from "@/types";
 import { formatDateTime, formatRelativeTime, cn } from "@/lib/utils";
 
 function StatusBadge({ status, health }: { status: string; health: HealthStatus }) {
@@ -81,7 +81,7 @@ function StatItem({ label, value, icon: Icon }: { label: string; value: string; 
 export default function MonitorDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { toast } = useToast();
-  const [monitor, setMonitor] = useState<Monitor | null>(null);
+  const [monitor, setMonitor] = useState<MonitorResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -350,7 +350,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
               <Separator />
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">Webhook 通知</p>
-                <p className="font-medium">{monitor.webhook_name || "未配置"}</p>
+                <p className="font-medium">{monitor.webhook?.name || "未配置"}</p>
               </div>
             </CardContent>
           </Card>

@@ -5,6 +5,7 @@ import {
   Webhook,
   CreateWebhookData,
   Monitor,
+  MonitorResponse,
   PaginatedResponse,
   CreateMonitorData,
   DashboardData,
@@ -157,13 +158,13 @@ export const monitorsApi = {
     apiClient.get<PaginatedResponse<Monitor>>('/monitors', { params, ...config }),
 
   get: (id: string, config?: AxiosRequestConfig) =>
-    apiClient.get<Monitor>(`/monitors/${id}`, config),
+    apiClient.get<MonitorResponse>(`/monitors/${id}`, config),
 
   create: (data: CreateMonitorData, config?: AxiosRequestConfig) =>
-    apiClient.post<Monitor>('/monitors', data, config),
+    apiClient.post<MonitorResponse>('/monitors', data, config),
 
   update: (id: string, data: Partial<CreateMonitorData>, config?: AxiosRequestConfig) =>
-    apiClient.put<Monitor>(`/monitors/${id}`, data, config),
+    apiClient.put<MonitorResponse>(`/monitors/${id}`, data, config),
 
   delete: (id: string, config?: AxiosRequestConfig) =>
     apiClient.delete(`/monitors/${id}`, config),

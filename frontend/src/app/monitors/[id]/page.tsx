@@ -160,9 +160,11 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
     );
   }
 
-  const totalChecks = monitor.total_checks || 0;
-  const successChecks = monitor.success_checks || 0;
-  const failedChecks = monitor.failed_checks || 0;
+  // Get stats from nested stats object
+  const stats = monitor.stats;
+  const totalChecks = stats?.total_checks || 0;
+  const successChecks = stats?.success_checks || 0;
+  const failedChecks = stats?.failed_checks || 0;
   const criticalThreshold = monitor.critical_threshold || monitor.warning_threshold * 2 || 5000;
   
   const successRate = totalChecks > 0

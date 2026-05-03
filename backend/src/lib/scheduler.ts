@@ -35,9 +35,17 @@ async function sendCronFailureAlert(errorMessage: string, jobLogId: string): Pro
     return;
   }
 
-  const atContent = webhook.at_users
-    ? webhook.at_users.split(',').map(p => `<@${p.trim()}>`).join(' ')
+  // Parse at_users - support both individual users and @all
+  const atUsersList = webhook.at_users ? webhook.at_users.split(',').map(p => p.trim()) : [];
+  const hasAll = atUsersList.some(u => u.toLowerCase() === 'all');
+  const individualUsers = atUsersList.filter(u => u.toLowerCase() !== 'all');
+  
+  // For Feishu/Lark: <@userid> format
+  // For WeChat Work: @all in text or mentioned_list
+  const atContent = individualUsers.length > 0
+    ? individualUsers.map(p => `<@${p}>`).join(' ')
     : '';
+  const atAllText = hasAll ? '@all' : '';
 
   const message = {
     msgtype: 'markdown',
@@ -50,7 +58,7 @@ async function sendCronFailureAlert(errorMessage: string, jobLogId: string): Pro
 > **时间**: ${new Date().toLocaleString('zh-CN')}
 
 请立即检查系统状态！
-${atContent}`
+${atAllText} ${atContent}`
     }
   };
 
@@ -324,9 +332,18 @@ async function sendAlertNotification(
   }
 
   const color = level === 'critical' ? 'red' : 'warning';
-  const atContent = webhook.at_users
-    ? webhook.at_users.split(',').map(p => `<@${p.trim()}>`).join(' ')
+  
+  // Parse at_users - support both individual users and @all
+  const atUsersList = webhook.at_users ? webhook.at_users.split(',').map(p => p.trim()) : [];
+  const hasAll = atUsersList.some(u => u.toLowerCase() === 'all');
+  const individualUsers = atUsersList.filter(u => u.toLowerCase() !== 'all');
+  
+  // For Feishu/Lark: <@userid> format
+  // For WeChat Work: @all in text or mentioned_list
+  const atContent = individualUsers.length > 0
+    ? individualUsers.map(p => `<@${p}>`).join(' ')
     : '';
+  const atAllText = hasAll ? '@all' : '';
 
   const alertMessage = {
     msgtype: 'markdown',
@@ -342,7 +359,7 @@ async function sendAlertNotification(
 > **URL**: ${monitor.url}
 
 请尽快检查！
-${atContent}`
+${atAllText} ${atContent}`
     }
   };
 
@@ -378,9 +395,17 @@ async function sendRecoveryNotification(monitor: Monitor): Promise<void> {
     }
   }
 
-  const atContent = webhook.at_users
-    ? webhook.at_users.split(',').map((p: string) => `<@${p.trim()}>`).join(' ')
+  // Parse at_users - support both individual users and @all
+  const atUsersList = webhook.at_users ? webhook.at_users.split(',').map(p => p.trim()) : [];
+  const hasAll = atUsersList.some(u => u.toLowerCase() === 'all');
+  const individualUsers = atUsersList.filter(u => u.toLowerCase() !== 'all');
+  
+  // For Feishu/Lark: <@userid> format
+  // For WeChat Work: @all in text or mentioned_list
+  const atContent = individualUsers.length > 0
+    ? individualUsers.map(p => `<@${p}>`).join(' ')
     : '';
+  const atAllText = hasAll ? '@all' : '';
 
   const recoveryMessage = {
     msgtype: 'markdown',
@@ -394,7 +419,7 @@ async function sendRecoveryNotification(monitor: Monitor): Promise<void> {
 > **URL**: ${monitor.url}
 
 服务已恢复正常！
-${atContent}`
+${atAllText} ${atContent}`
     }
   };
 

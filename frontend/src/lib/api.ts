@@ -54,10 +54,14 @@ api.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiResponse>) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      // 排除登录接口的 401 错误（用户名或密码错误）
+      const isLoginEndpoint = error.config?.url?.includes('/auth/login');
+      if (!isLoginEndpoint) {
+        // Token expired or invalid - only redirect for non-login endpoints
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     } else if (error.response?.status === 429) {
       // Rate limit exceeded - show user-friendly message
       const message = error.response.data?.message || '请求过于频繁，请稍后再试';

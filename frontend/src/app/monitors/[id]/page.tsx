@@ -91,16 +91,13 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
         const data = await monitorsApi.get(params.id);
         setMonitor(data);
       } catch (error) {
-        toast({
-          title: "获取监控详情失败",
-          variant: "destructive",
-        });
+        console.error("Failed to fetch monitor:", error);
       } finally {
         setLoading(false);
       }
     };
     fetchMonitor();
-  }, [params.id, toast]);
+  }, [params.id]); // Only depend on params.id, not toast
 
   const handlePause = async () => {
     try {

@@ -52,12 +52,31 @@ app.use(cors({
   credentials: true
 }));
 
+// More relaxed rate limiter for read-only endpoints
+const readLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 1200, // Limit each IP to 1200 requests per minute (20 per second)
+  message: {
+    success: false,
+    message: '请求过于频繁，请稍后再试',
+    code: 'RATE_LIMIT_EXCEEDED'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Apply rate limiting to all API routes except auth logout
 app.use('/api/', (req, res, next) => {
   // Skip rate limiting for logout endpoint
   if (req.path === '/auth/logout') {
     return next();
   }
+  
+  // Use more relaxed limiter for GET requests (read-only operations)
+  if (req.method === 'GET') {
+    return readLimiter(req, res, next);
+  }
+  
   return limiter(req, res, next);
 });
 

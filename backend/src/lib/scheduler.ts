@@ -263,7 +263,7 @@ async function handleResponseTimeWarning(
   // Check if there's already an active warning for this monitor
   const existingAlert = await queryOne(
     `SELECT * FROM alerts 
-     WHERE monitor_id = ? AND status = 'active' AND alert_type = 'slow_response'`,
+     WHERE monitor_id = ? AND status = 'firing' AND alert_level = 'warning'`,
     [monitor.id]
   );
 

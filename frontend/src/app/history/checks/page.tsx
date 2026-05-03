@@ -157,16 +157,16 @@ export default function CheckHistoryPage() {
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <Select
-                  value={filters.monitor_id}
+                  value={filters.monitor_id || "all"}
                   onValueChange={(value) =>
-                    setFilters((prev) => ({ ...prev, monitor_id: value }))
+                    setFilters((prev) => ({ ...prev, monitor_id: value === "all" ? "" : value }))
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="选择监控项" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部监控项</SelectItem>
+                    <SelectItem value="all">全部监控项</SelectItem>
                     {monitors.map((monitor) => (
                       <SelectItem key={monitor.id} value={monitor.id}>
                         {monitor.name}
@@ -177,16 +177,16 @@ export default function CheckHistoryPage() {
               </div>
               <div className="w-full sm:w-40">
                 <Select
-                  value={filters.status}
+                  value={filters.status || "all"}
                   onValueChange={(value) =>
-                    setFilters((prev) => ({ ...prev, status: value }))
+                    setFilters((prev) => ({ ...prev, status: value === "all" ? "" : value }))
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="状态" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">全部状态</SelectItem>
+                    <SelectItem value="all">全部状态</SelectItem>
                     <SelectItem value="success">成功</SelectItem>
                     <SelectItem value="failure">失败</SelectItem>
                   </SelectContent>

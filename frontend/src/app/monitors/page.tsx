@@ -181,15 +181,19 @@ export default function MonitorsPage() {
   });
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  // Destructure filters to avoid object reference changes triggering unnecessary re-renders
+  const { status, health_status, keyword } = filters;
+  const { page, page_size } = pagination;
+
   const fetchMonitors = useCallback(async () => {
     try {
       setLoading(true);
       const response = await monitorsApi.list({
-        page: pagination.page,
-        page_size: pagination.page_size,
-        status: filters.status,
-        health_status: filters.health_status,
-        keyword: filters.keyword,
+        page: page,
+        page_size: page_size,
+        status: status,
+        health_status: health_status,
+        keyword: keyword,
       });
       setMonitors(response.items);
       setPagination(response.pagination);
@@ -201,11 +205,12 @@ export default function MonitorsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters, pagination.page, pagination.page_size, toast]);
+  }, [status, health_status, keyword, page, page_size, toast]);
 
+  // Only fetch when specific dependencies change, not the entire filters object
   useEffect(() => {
     fetchMonitors();
-  }, [fetchMonitors]);
+  }, [status, health_status, keyword, page, page_size]);
 
   const handlePause = async (id: string) => {
     try {

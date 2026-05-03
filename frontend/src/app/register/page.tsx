@@ -78,7 +78,10 @@ export default function RegisterPage() {
         description: "请使用新账户登录",
         variant: "success",
       });
-      router.push("/login");
+      // 延迟跳转，让用户看到成功提示
+      setTimeout(() => {
+        router.push("/login");
+      }, 1500);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {

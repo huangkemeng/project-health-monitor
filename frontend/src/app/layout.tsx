@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { ToastProvider } from "@/components/ui/toast";
 import { Toaster } from "@/components/ui/toaster";
 import { GlobalErrorHandler } from "@/components/GlobalErrorHandler";
 
@@ -20,11 +21,13 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className={inter.className}>
-        <AuthProvider>
-          {children}
-          <Toaster />
-          <GlobalErrorHandler />
-        </AuthProvider>
+        <ToastProvider>
+          <AuthProvider>
+            {children}
+            <Toaster />
+            <GlobalErrorHandler />
+          </AuthProvider>
+        </ToastProvider>
       </body>
     </html>
   );

@@ -18,16 +18,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [themeStyle, setThemeStyleState] = useState<ThemeStyle>('classic');
   const [mounted, setMounted] = useState(false);
 
-  // Initialize theme from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY) as ThemeStyle | null;
-    if (stored && (stored === 'classic' || stored === 'linear')) {
-      setThemeStyleState(stored);
-      applyTheme(stored);
-    }
-    setMounted(true);
-  }, []);
-
   // Apply theme to document
   const applyTheme = (style: ThemeStyle) => {
     if (typeof document !== 'undefined') {
@@ -40,9 +30,25 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Initialize theme from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY) as ThemeStyle | null;
+    if (stored && (stored === 'classic' || stored === 'linear')) {
+      setThemeStyleState(stored);
+      applyTheme(stored);
+    }
+    setMounted(true);
+  }, []);
+
+  // Apply theme whenever themeStyle changes
+  useEffect(() => {
+    if (mounted) {
+      applyTheme(themeStyle);
+    }
+  }, [themeStyle, mounted]);
+
   const setThemeStyle = (style: ThemeStyle) => {
     setThemeStyleState(style);
-    applyTheme(style);
     localStorage.setItem(THEME_STORAGE_KEY, style);
   };
 

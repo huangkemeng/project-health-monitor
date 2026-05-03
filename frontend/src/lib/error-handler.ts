@@ -26,14 +26,27 @@ export class ApiException extends Error {
 
 export function getErrorMessage(error: unknown): string {
   // 优先处理 ApiException，获取字段级错误信息
-  // 同时检查 name 属性以防止 instanceof 判断失败
-  if (error instanceof ApiException || (error instanceof Error && error.name === 'ApiException')) {
+  // 同时检查 name 属性或 code 属性以防止 instanceof 判断失败
+  if (error instanceof ApiException) {
     const apiError = error as ApiException;
     if (apiError.errors && apiError.errors.length > 0) {
       return apiError.errors.map(e => e.message).join('\n');
     }
     if (apiError.message) {
       return apiError.message;
+    }
+  }
+
+  // 通过 name 或 code 属性识别 ApiException
+  if (error && typeof error === 'object') {
+    const err = error as Record<string, unknown>;
+    if (err.name === 'ApiException' || typeof err.code === 'number') {
+      if (err.errors && Array.isArray(err.errors) && err.errors.length > 0) {
+        return err.errors.map((e: { message?: string }) => e.message).filter(Boolean).join('\n');
+      }
+      if (typeof err.message === 'string' && err.message) {
+        return err.message;
+      }
     }
   }
 

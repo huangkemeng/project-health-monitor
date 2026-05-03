@@ -28,7 +28,7 @@ export interface AuthResponse {
 // Monitor Types
 export type MonitorStatus = 'active' | 'paused' | 'archived';
 export type HealthStatus = 'normal' | 'warning' | 'critical';
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
 
 export interface Monitor {
   id: string;
@@ -42,12 +42,18 @@ export interface Monitor {
   expected_status: number;
   retry_times: number;
   warning_threshold: number;
+  critical_threshold?: number;
   status: MonitorStatus;
   health_status: HealthStatus;
   consecutive_failures: number;
   last_check_at: string | null;
   last_response_time: number | null;
+  response_time?: number | null;
   webhook_id: string | null;
+  webhook_name?: string | null;
+  total_checks?: number;
+  success_checks?: number;
+  failed_checks?: number;
   created_at: string;
   updated_at: string;
 }
@@ -63,6 +69,7 @@ export interface MonitorStats {
 export interface MonitorResponse extends Monitor {
   stats?: MonitorStats;
   webhook?: WebhookResponse;
+  critical_threshold: number;
 }
 
 export interface CreateMonitorData {
@@ -76,6 +83,7 @@ export interface CreateMonitorData {
   expected_status?: number;
   retry_times?: number;
   warning_threshold?: number;
+  critical_threshold?: number;
   webhook_id?: string;
 }
 
@@ -154,26 +162,18 @@ export interface Alert {
   monitor_id: string;
   monitor_name: string;
   alert_level: AlertLevel;
+  level?: AlertLevel;
   status: AlertStatus;
   started_at: string;
   ended_at: string | null;
+  resolved_at?: string | null;
   duration: number | null;
   send_status: SendStatus;
+  message?: string;
   created_at: string;
 }
 
-export interface AlertResponse {
-  id: string;
-  monitor_id: string;
-  monitor_name: string;
-  alert_level: AlertLevel;
-  status: AlertStatus;
-  started_at: string;
-  ended_at: string | null;
-  duration: number | null;
-  send_status: SendStatus;
-  created_at: string;
-}
+export interface AlertResponse extends Alert {}
 
 // Pagination Types
 export interface PaginationParams {
@@ -214,8 +214,8 @@ export interface DashboardStats {
   critical_monitors: number;
   total_checks_24h: number;
   success_rate_24h: number;
+  success_rate?: number;
   avg_response_time_24h: number;
-  recent_alerts: AlertResponse[];
 }
 
 export interface DashboardMonitorItem {
@@ -226,11 +226,14 @@ export interface DashboardMonitorItem {
   status: MonitorStatus;
   last_check_at: string | null;
   last_response_time: number | null;
+  response_time?: number | null;
 }
 
 export interface DashboardData {
   stats: DashboardStats;
   monitors: DashboardMonitorItem[];
+  recent_monitors?: DashboardMonitorItem[];
+  recent_alerts?: Alert[];
 }
 
 export interface ResponseTimeData {

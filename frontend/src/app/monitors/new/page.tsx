@@ -1,32 +1,60 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import MainLayout from '@/components/layout/MainLayout';
-import { monitorsApi, webhooksApi } from '@/lib/api';
-import { Webhook, HttpMethod } from '@/types';
-import { ArrowLeft, AlertTriangle } from 'lucide-react';
-import Link from 'next/link';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, AlertTriangle, Plus, Globe, Clock, Bell, Settings } from "lucide-react";
+import { MainLayout } from "@/components/layout/MainLayout";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { monitorsApi, webhooksApi } from "@/lib/api";
+import { Webhook, HttpMethod } from "@/types";
+
+const HTTP_METHODS: HttpMethod[] = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
 
 export default function NewMonitorPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUrlConfirm, setShowUrlConfirm] = useState(false);
   const [urlTestResult, setUrlTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
   const [formData, setFormData] = useState({
-    name: '',
-    url: '',
-    method: 'GET' as HttpMethod,
-    headers: '{}',
-    body: '',
+    name: "",
+    url: "",
+    method: "GET" as HttpMethod,
+    headers: "{}",
+    body: "",
     interval: 60,
     timeout: 10,
     expected_status: 200,
-    retry_times: 5,
+    retry_times: 3,
     warning_threshold: 3000,
-    webhook_id: '',
+    critical_threshold: 5000,
+    webhook_id: "",
   });
 
   useEffect(() => {
@@ -34,34 +62,29 @@ export default function NewMonitorPage() {
       try {
         const response = await webhooksApi.list();
         setWebhooks(response.items);
-        // Set default webhook if exists
-        const defaultWebhook = response.items.find(w => w.is_default);
+        const defaultWebhook = response.items.find((w) => w.is_default);
         if (defaultWebhook) {
-          setFormData(prev => ({ ...prev, webhook_id: defaultWebhook.id }));
+          setFormData((prev) => ({ ...prev, webhook_id: defaultWebhook.id }));
         }
       } catch (error) {
-        console.error('Failed to fetch webhooks:', error);
+        console.error("Failed to fetch webhooks:", error);
       }
     };
     fetchWebhooks();
   }, []);
 
-  // Validate URL is safe (prevent XSS via javascript: protocol)
   const isSafeUrl = (url: string): boolean => {
     try {
       const parsed = new URL(url);
-      // Only allow http and https protocols
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
     } catch {
       return false;
     }
   };
 
-  // Test URL reachability
   const testUrlReachability = async (): Promise<{ success: boolean; message: string }> => {
-    // First check URL safety
     if (!isSafeUrl(formData.url)) {
-      return { success: false, message: 'URL 不安全，仅支持 http:// 或 https:// 协议' };
+      return { success: false, message: "URL 不安全，仅支持 http:// 或 https:// 协议" };
     }
 
     try {
@@ -72,12 +95,12 @@ export default function NewMonitorPage() {
         method: formData.method,
         signal: controller.signal,
         headers: {
-          'User-Agent': 'ProjectHealthMonitor/1.0',
+          "User-Agent": "ProjectHealthMonitor/1.0",
           ...safeJsonParse(formData.headers, {}),
         },
       };
 
-      if (formData.body && ['POST', 'PUT'].includes(formData.method)) {
+      if (formData.body && ["POST", "PUT", "PATCH"].includes(formData.method)) {
         fetchOptions.body = formData.body;
       }
 
@@ -85,7 +108,7 @@ export default function NewMonitorPage() {
       clearTimeout(timeoutId);
 
       if (response.status === formData.expected_status) {
-        return { success: true, message: 'URL 可访问' };
+        return { success: true, message: "URL 可访问" };
       } else {
         return {
           success: false,
@@ -94,12 +117,12 @@ export default function NewMonitorPage() {
       }
     } catch (err) {
       if (err instanceof Error) {
-        if (err.name === 'AbortError') {
-          return { success: false, message: 'URL 测试超时（5秒）' };
+        if (err.name === "AbortError") {
+          return { success: false, message: "URL 测试超时（5秒）" };
         }
         return { success: false, message: `无法访问: ${err.message}` };
       }
-      return { success: false, message: 'URL 不可达' };
+      return { success: false, message: "URL 不可达" };
     }
   };
 
@@ -111,31 +134,18 @@ export default function NewMonitorPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitForm = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // Validate headers JSON
       let headers = {};
       try {
         headers = JSON.parse(formData.headers);
       } catch {
-        setError('Headers 必须是有效的 JSON 格式');
+        setError("Headers 必须是有效的 JSON 格式");
         setLoading(false);
         return;
-      }
-
-      // Test URL reachability before saving
-      if (!showUrlConfirm) {
-        const testResult = await testUrlReachability();
-        if (!testResult.success) {
-          setUrlTestResult(testResult);
-          setShowUrlConfirm(true);
-          setLoading(false);
-          return;
-        }
       }
 
       await monitorsApi.create({
@@ -149,253 +159,331 @@ export default function NewMonitorPage() {
         expected_status: formData.expected_status,
         retry_times: formData.retry_times,
         warning_threshold: formData.warning_threshold,
+        critical_threshold: formData.critical_threshold,
         webhook_id: formData.webhook_id || undefined,
       });
 
-      router.push('/monitors');
+      toast({ title: "监控项创建成功", variant: "success" });
+      router.push("/monitors");
     } catch (err) {
-      setError(err instanceof Error ? err.message : '创建失败');
+      setError(err instanceof Error ? err.message : "创建失败");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleConfirmContinue = () => {
-    setShowUrlConfirm(false);
-    setLoading(true);
-    // Re-submit the form, skipping the URL test
-    const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
-    handleSubmit(fakeEvent);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!showUrlConfirm) {
+      const testResult = await testUrlReachability();
+      if (!testResult.success) {
+        setUrlTestResult(testResult);
+        setShowUrlConfirm(true);
+        return;
+      }
+    }
+
+    await submitForm();
   };
 
-  const handleCancelConfirm = () => {
+  const handleConfirmContinue = () => {
     setShowUrlConfirm(false);
-    setUrlTestResult(null);
+    submitForm();
+  };
+
+  const updateField = (field: string, value: string | number) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
     <MainLayout>
-      <div className="max-w-2xl mx-auto">
-        <div className="mb-6">
-          <Link
-            href="/monitors"
-            className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            返回列表
-          </Link>
+      <div className="max-w-3xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" asChild>
+            <Link href="/monitors">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">新建监控项</h1>
+            <p className="text-muted-foreground text-sm">创建一个新的 URL 监控任务</p>
+          </div>
         </div>
 
-        <div className="card">
-          <div className="card-header">
-            <h1 className="text-xl font-bold text-gray-900">新建监控项</h1>
-          </div>
+        {/* Error Alert */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>错误</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-          <form onSubmit={handleSubmit} className="card-body space-y-6">
-            {error && (
-              <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">
-                {error}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                基本信息
+              </CardTitle>
+              <CardDescription>配置监控目标的基本信息</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">
+                  名称 <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="name"
+                  required
+                  maxLength={50}
+                  value={formData.name}
+                  onChange={(e) => updateField("name", e.target.value)}
+                  placeholder="例如：用户服务 API"
+                />
               </div>
-            )}
 
-            {/* URL Test Confirmation Modal */}
-            {showUrlConfirm && urlTestResult && (
-              <div className="rounded-md bg-yellow-50 border border-yellow-200 p-4">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                  <div className="flex-1">
-                    <h3 className="text-sm font-medium text-yellow-800">
-                      URL 不可达
-                    </h3>
-                    <p className="mt-1 text-sm text-yellow-700">
-                      {urlTestResult.message}，是否继续保存？
-                    </p>
-                    <div className="mt-3 flex gap-3">
-                      <button
-                        type="button"
-                        onClick={handleConfirmContinue}
-                        className="px-3 py-1.5 text-sm font-medium text-yellow-800 bg-yellow-100 rounded-md hover:bg-yellow-200"
-                      >
-                        继续保存
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCancelConfirm}
-                        className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
-                      >
-                        返回修改
-                      </button>
-                    </div>
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="url">
+                  URL <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="url"
+                  type="url"
+                  required
+                  value={formData.url}
+                  onChange={(e) => updateField("url", e.target.value)}
+                  placeholder="https://api.example.com/health"
+                />
+                <p className="text-xs text-muted-foreground">保存前将自动测试 URL 是否可达</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="method">HTTP 方法</Label>
+                  <Select
+                    value={formData.method}
+                    onValueChange={(value) => updateField("method", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HTTP_METHODS.map((method) => (
+                        <SelectItem key={method} value={method}>
+                          {method}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="expected_status">期望状态码</Label>
+                  <Input
+                    id="expected_status"
+                    type="number"
+                    min={100}
+                    max={599}
+                    value={formData.expected_status}
+                    onChange={(e) => updateField("expected_status", parseInt(e.target.value))}
+                  />
                 </div>
               </div>
-            )}
+            </CardContent>
+          </Card>
 
-            <div>
-              <label className="label">名称 *</label>
-              <input
-                type="text"
-                required
-                maxLength={50}
-                className="input"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="例如：用户服务API"
-              />
-            </div>
-
-            <div>
-              <label className="label">URL *</label>
-              <input
-                type="url"
-                required
-                className="input"
-                value={formData.url}
-                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                placeholder="https://api.example.com/health"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                保存前将自动测试 URL 是否可达
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">HTTP 方法</label>
-                <select
-                  className="input"
-                  value={formData.method}
-                  onChange={(e) => setFormData({ ...formData, method: e.target.value as HttpMethod })}
-                >
-                  <option value="GET">GET</option>
-                  <option value="POST">POST</option>
-                  <option value="PUT">PUT</option>
-                  <option value="DELETE">DELETE</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="label">期望状态码</label>
-                <input
-                  type="number"
-                  min={100}
-                  max={599}
-                  className="input"
-                  value={formData.expected_status}
-                  onChange={(e) => setFormData({ ...formData, expected_status: parseInt(e.target.value) })}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">探测间隔 (秒)</label>
-                <input
-                  type="number"
-                  min={30}
-                  max={300}
-                  className="input"
-                  value={formData.interval}
-                  onChange={(e) => setFormData({ ...formData, interval: parseInt(e.target.value) })}
-                />
-              </div>
-
-              <div>
-                <label className="label">超时时间 (秒)</label>
-                <input
-                  type="number"
-                  min={5}
-                  max={60}
-                  className="input"
-                  value={formData.timeout}
-                  onChange={(e) => setFormData({ ...formData, timeout: parseInt(e.target.value) })}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">连续失败次数 (触发告警)</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={10}
-                  className="input"
-                  value={formData.retry_times}
-                  onChange={(e) => setFormData({ ...formData, retry_times: parseInt(e.target.value) })}
-                />
-              </div>
-
-              <div>
-                <label className="label">响应时间警告阈值 (ms)</label>
-                <input
-                  type="number"
-                  min={1000}
-                  max={30000}
-                  className="input"
-                  value={formData.warning_threshold}
-                  onChange={(e) => setFormData({ ...formData, warning_threshold: parseInt(e.target.value) })}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="label">Headers (JSON 格式)</label>
-              <textarea
-                className="input font-mono text-sm"
-                rows={3}
-                value={formData.headers}
-                onChange={(e) => setFormData({ ...formData, headers: e.target.value })}
-                placeholder='{"Authorization": "Bearer token"}'
-              />
-            </div>
-
-            {formData.method !== 'GET' && (
-              <div>
-                <label className="label">请求体</label>
-                <textarea
-                  className="input font-mono text-sm"
+          {/* Request Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                请求设置
+              </CardTitle>
+              <CardDescription>配置 HTTP 请求的详细信息</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="headers">请求头 (JSON 格式)</Label>
+                <Textarea
+                  id="headers"
+                  className="font-mono text-sm"
                   rows={3}
-                  value={formData.body}
-                  onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-                  placeholder='{"key": "value"}'
+                  value={formData.headers}
+                  onChange={(e) => updateField("headers", e.target.value)}
+                  placeholder='{"Authorization": "Bearer token", "Content-Type": "application/json"}'
                 />
               </div>
-            )}
 
-            <div>
-              <label className="label">告警 Webhook</label>
-              <select
-                className="input"
-                value={formData.webhook_id}
-                onChange={(e) => setFormData({ ...formData, webhook_id: e.target.value })}
-              >
-                <option value="">不发送告警</option>
-                {webhooks.map((webhook) => (
-                  <option key={webhook.id} value={webhook.id}>
-                    {webhook.name} {webhook.is_default ? '(默认)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+              {formData.method !== "GET" && formData.method !== "HEAD" && (
+                <div className="space-y-2">
+                  <Label htmlFor="body">请求体</Label>
+                  <Textarea
+                    id="body"
+                    className="font-mono text-sm"
+                    rows={4}
+                    value={formData.body}
+                    onChange={(e) => updateField("body", e.target.value)}
+                    placeholder='{"key": "value"}'
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-            <div className="flex items-center justify-end gap-4 pt-4">
-              <Link
-                href="/monitors"
-                className="btn-secondary"
-              >
-                取消
-              </Link>
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn-primary"
-              >
-                {loading ? '创建中...' : '创建'}
-              </button>
-            </div>
-          </form>
-        </div>
+          {/* Monitoring Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                监控设置
+              </CardTitle>
+              <CardDescription>配置监控的频率和阈值</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="interval">探测间隔 (秒)</Label>
+                  <Input
+                    id="interval"
+                    type="number"
+                    min={30}
+                    max={3600}
+                    value={formData.interval}
+                    onChange={(e) => updateField("interval", parseInt(e.target.value))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="timeout">超时时间 (秒)</Label>
+                  <Input
+                    id="timeout"
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={formData.timeout}
+                    onChange={(e) => updateField("timeout", parseInt(e.target.value))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="retry_times">连续失败次数 (触发告警)</Label>
+                  <Input
+                    id="retry_times"
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={formData.retry_times}
+                    onChange={(e) => updateField("retry_times", parseInt(e.target.value))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="webhook_id">告警 Webhook</Label>
+                  <Select
+                    value={formData.webhook_id}
+                    onValueChange={(value) => updateField("webhook_id", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="不发送告警" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">不发送告警</SelectItem>
+                      {webhooks.map((webhook) => (
+                        <SelectItem key={webhook.id} value={webhook.id}>
+                          {webhook.name} {webhook.is_default && "(默认)"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Thresholds */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                告警阈值
+              </CardTitle>
+              <CardDescription>设置响应时间告警阈值</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="warning_threshold">警告阈值 (ms)</Label>
+                  <Input
+                    id="warning_threshold"
+                    type="number"
+                    min={100}
+                    max={60000}
+                    value={formData.warning_threshold}
+                    onChange={(e) => updateField("warning_threshold", parseInt(e.target.value))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="critical_threshold">严重阈值 (ms)</Label>
+                  <Input
+                    id="critical_threshold"
+                    type="number"
+                    min={100}
+                    max={60000}
+                    value={formData.critical_threshold}
+                    onChange={(e) => updateField("critical_threshold", parseInt(e.target.value))}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-4">
+            <Button type="button" variant="outline" asChild>
+              <Link href="/monitors">取消</Link>
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? (
+                <>创建中...</>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  创建监控项
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+
+        {/* URL Test Confirmation Dialog */}
+        <Dialog open={showUrlConfirm} onOpenChange={setShowUrlConfirm}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                URL 不可达
+              </DialogTitle>
+              <DialogDescription>
+                {urlTestResult?.message}，是否继续保存？
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowUrlConfirm(false)}>
+                返回修改
+              </Button>
+              <Button onClick={handleConfirmContinue} variant="default">
+                继续保存
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );

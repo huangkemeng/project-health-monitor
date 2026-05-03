@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import MainLayout from '@/components/layout/MainLayout';
+import { MainLayout } from '@/components/layout/MainLayout';
 import { monitorsApi, webhooksApi } from '@/lib/api';
 import { Monitor, Webhook, HttpMethod } from '@/types';
 import { ArrowLeft } from 'lucide-react';

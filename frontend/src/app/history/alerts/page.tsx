@@ -1,31 +1,91 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import MainLayout from '@/components/layout/MainLayout';
-import { historyApi, monitorsApi } from '@/lib/api';
-import { Alert, Monitor } from '@/types';
-import { formatDate, formatDuration, getStatusLabel } from '@/lib/utils';
-import { Search } from 'lucide-react';
-import Link from 'next/link';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import {
+  Search,
+  History,
+  Bell,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Activity,
+} from "lucide-react";
+import { MainLayout } from "@/components/layout/MainLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { historyApi, monitorsApi } from "@/lib/api";
+import { Alert as AlertType, Monitor, AlertLevel } from "@/types";
+import { formatDateTime, formatDuration, cn } from "@/lib/utils";
+
+interface Pagination {
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+}
+
+function AlertLevelBadge({ level }: { level: AlertLevel }) {
+  const config = {
+    warning: { label: "警告", variant: "warning" as const, icon: AlertTriangle },
+    critical: { label: "严重", variant: "destructive" as const, icon: AlertCircle },
+  };
+
+  const { label, variant, icon: Icon } = config[level] || config.warning;
+
+  return (
+    <Badge variant={variant} className="gap-1">
+      <Icon className="h-3 w-3" />
+      {label}
+    </Badge>
+  );
+}
 
 export default function AlertHistoryPage() {
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const { toast } = useToast();
+  const [alerts, setAlerts] = useState<AlertType[]>([]);
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
-    monitor_id: '',
-    status: '',
-    alert_level: '',
+    monitor_id: "",
+    status: "",
+    alert_level: "",
+  });
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    page_size: 20,
+    total: 0,
+    total_pages: 0,
   });
 
-  // Fetch monitors for filter
   useEffect(() => {
     const fetchMonitors = async () => {
       try {
         const response = await monitorsApi.list({ page_size: 100 });
         setMonitors(response.items);
       } catch (error) {
-        console.error('Failed to fetch monitors:', error);
+        console.error("Failed to fetch monitors:", error);
       }
     };
     fetchMonitors();
@@ -37,183 +97,267 @@ export default function AlertHistoryPage() {
       const response = await historyApi.getAlerts({
         monitor_id: filters.monitor_id || undefined,
         status: filters.status || undefined,
-        page_size: 50,
+        page: pagination.page,
+        page_size: pagination.page_size,
       });
-      // Filter by alert_level if specified
+
       let filteredAlerts = response.items;
       if (filters.alert_level) {
-        filteredAlerts = filteredAlerts.filter(a => a.alert_level === filters.alert_level);
+        filteredAlerts = filteredAlerts.filter(
+          (a) => a.alert_level === filters.alert_level
+        );
       }
+
       setAlerts(filteredAlerts);
+      setPagination(response.pagination);
     } catch (error) {
-      console.error('Failed to fetch alerts:', error);
+      toast({
+        title: "获取告警历史失败",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearch = () => {
-    fetchAlerts();
-  };
-
-  // Initial load
   useEffect(() => {
     fetchAlerts();
-  }, []);
+  }, [filters.monitor_id, filters.status, filters.alert_level, pagination.page]);
 
-  // Get monitor name by id
   const getMonitorName = (monitorId: string) => {
-    const monitor = monitors.find(m => m.id === monitorId);
-    return monitor?.name || monitorId;
+    const monitor = monitors.find((m) => m.id === monitorId);
+    return monitor?.name || monitorId.slice(0, 8);
+  };
+
+  const handleSearch = () => {
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    fetchAlerts();
   };
 
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-gray-900">告警历史</h1>
-            <nav className="flex space-x-4">
-              <Link
-                href="/history/checks"
-                className="px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700"
-              >
-                探测记录
-              </Link>
-              <Link
-                href="/history/alerts"
-                className="px-3 py-2 text-sm font-medium text-brand-600 border-b-2 border-brand-500"
-              >
-                告警记录
-              </Link>
-            </nav>
+        {/* Header with Tabs */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">历史记录</h1>
+            <p className="text-muted-foreground mt-1">查看监控探测和告警历史</p>
           </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="border-b">
+          <nav className="flex gap-6">
+            <Link
+              href="/history/checks"
+              className={cn(
+                "flex items-center gap-2 pb-3 text-sm font-medium border-b-2 transition-colors",
+                "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Activity className="h-4 w-4" />
+              探测记录
+            </Link>
+            <Link
+              href="/history/alerts"
+              className={cn(
+                "flex items-center gap-2 pb-3 text-sm font-medium border-b-2 transition-colors",
+                "border-primary text-foreground"
+              )}
+            >
+              <Bell className="h-4 w-4" />
+              告警记录
+            </Link>
+          </nav>
         </div>
 
         {/* Filters */}
-        <div className="card">
-          <div className="card-body">
-            <div className="flex flex-wrap gap-4">
-              <div className="flex-1 min-w-[200px]">
-                <label className="label">监控项</label>
-                <select
-                  className="input"
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <Select
                   value={filters.monitor_id}
-                  onChange={(e) => setFilters({ ...filters, monitor_id: e.target.value })}
+                  onValueChange={(value) =>
+                    setFilters((prev) => ({ ...prev, monitor_id: value }))
+                  }
                 >
-                  <option value="">全部</option>
-                  {monitors.map((monitor) => (
-                    <option key={monitor.id} value={monitor.id}>
-                      {monitor.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择监控项" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">全部监控项</SelectItem>
+                    {monitors.map((monitor) => (
+                      <SelectItem key={monitor.id} value={monitor.id}>
+                        {monitor.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="w-40">
-                <label className="label">告警级别</label>
-                <select
-                  className="input"
+              <div className="w-full sm:w-40">
+                <Select
                   value={filters.alert_level}
-                  onChange={(e) => setFilters({ ...filters, alert_level: e.target.value })}
+                  onValueChange={(value) =>
+                    setFilters((prev) => ({ ...prev, alert_level: value }))
+                  }
                 >
-                  <option value="">全部</option>
-                  <option value="warning">警告</option>
-                  <option value="critical">严重</option>
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="告警级别" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">全部级别</SelectItem>
+                    <SelectItem value="warning">警告</SelectItem>
+                    <SelectItem value="critical">严重</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="w-40">
-                <label className="label">状态</label>
-                <select
-                  className="input"
+              <div className="w-full sm:w-40">
+                <Select
                   value={filters.status}
-                  onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                  onValueChange={(value) =>
+                    setFilters((prev) => ({ ...prev, status: value }))
+                  }
                 >
-                  <option value="">全部</option>
-                  <option value="firing">触发中</option>
-                  <option value="resolved">已恢复</option>
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="状态" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">全部状态</SelectItem>
+                    <SelectItem value="active">进行中</SelectItem>
+                    <SelectItem value="resolved">已恢复</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="flex items-end">
-                <button
-                  onClick={handleSearch}
-                  className="btn-primary inline-flex items-center gap-2"
-                  disabled={loading}
-                >
-                  <Search className="h-4 w-4" />
-                  查询
-                </button>
-              </div>
+              <Button onClick={handleSearch} disabled={loading}>
+                <Search className="h-4 w-4 mr-2" />
+                查询
+              </Button>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Data Table */}
-        <div className="card">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">监控项</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">级别</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">开始时间</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">结束时间</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">持续时间</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">发送状态</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                      加载中...
-                    </td>
-                  </tr>
-                ) : alerts.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                      暂无告警记录
-                    </td>
-                  </tr>
-                ) : (
-                  alerts.map((alert) => (
-                    <tr key={alert.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {getMonitorName(alert.monitor_id)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          alert.alert_level === 'critical' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {getStatusLabel(alert.alert_level)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          alert.status === 'firing' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                        }`}>
-                          {getStatusLabel(alert.status)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(alert.started_at)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {alert.ended_at ? formatDate(alert.ended_at) : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {alert.duration ? formatDuration(alert.duration) : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {getStatusLabel(alert.send_status)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              告警记录
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>监控项</TableHead>
+                    <TableHead>级别</TableHead>
+                    <TableHead>状态</TableHead>
+                    <TableHead>开始时间</TableHead>
+                    <TableHead>恢复时间</TableHead>
+                    <TableHead>持续时间</TableHead>
+                    <TableHead>消息</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    [...Array(5)].map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell colSpan={7}>
+                          <Skeleton className="h-8" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : alerts.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={7}
+                        className="text-center py-12 text-muted-foreground"
+                      >
+                        <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>暂无告警记录</p>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    alerts.map((alert) => (
+                      <TableRow key={alert.id} className="hover:bg-muted/50">
+                        <TableCell className="font-medium">
+                          {getMonitorName(alert.monitor_id)}
+                        </TableCell>
+                        <TableCell>
+                          <AlertLevelBadge level={alert.alert_level} />
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={alert.status === "resolved" ? "success" : "destructive"}
+                            className="gap-1"
+                          >
+                            {alert.status === "resolved" ? (
+                              <CheckCircle className="h-3 w-3" />
+                            ) : (
+                              <XCircle className="h-3 w-3" />
+                            )}
+                            {alert.status === "resolved" ? "已恢复" : "进行中"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatDateTime(alert.started_at)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {alert.resolved_at
+                            ? formatDateTime(alert.resolved_at)
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {alert.duration !== null && alert.duration !== undefined
+                            ? formatDuration(alert.duration)
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className="text-sm max-w-xs truncate block"
+                            title={alert.message}
+                          >
+                            {alert.message}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Pagination */}
+            {pagination.total_pages > 1 && (
+              <div className="flex items-center justify-center gap-2 py-4 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setPagination((prev) => ({ ...prev, page: prev.page - 1 }))
+                  }
+                  disabled={pagination.page === 1 || loading}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  第 {pagination.page} 页，共 {pagination.total_pages} 页
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setPagination((prev) => ({ ...prev, page: prev.page + 1 }))
+                  }
+                  disabled={pagination.page === pagination.total_pages || loading}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </MainLayout>
   );

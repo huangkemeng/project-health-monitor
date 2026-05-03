@@ -1,150 +1,178 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
-import { AlertCircle } from 'lucide-react';
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Activity, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+
+const loginSchema = z.object({
+  username: z.string().min(1, "请输入用户名"),
+  password: z.string().min(1, "请输入密码"),
+  rememberMe: z.boolean().optional(),
+});
+
+type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading, error, clearError } = useAuth();
-  const [formData, setFormData] = useState({
-    username: '',
-    password: '',
-    rememberMe: false,
+  const { login } = useAuth();
+  const { toast } = useToast();
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+    watch,
+  } = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      rememberMe: false,
+    },
   });
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-    
-    if (!formData.username.trim()) {
-      errors.username = '请输入用户名';
-    }
-    
-    if (!formData.password) {
-      errors.password = '请输入密码';
-    }
-    
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
+  const rememberMe = watch("rememberMe");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    clearError();
-
-    if (!validateForm()) return;
-
+  const onSubmit = async (data: LoginForm) => {
+    setIsLoading(true);
     try {
-      await login(formData.username, formData.password, formData.rememberMe);
-      // Small delay to ensure token is written to localStorage
-      await new Promise(resolve => setTimeout(resolve, 100));
-      router.push('/dashboard');
-    } catch {
-      // Error is handled by the store
+      await login(data.username, data.password);
+      toast({
+        title: "登录成功",
+        description: "欢迎回来！",
+        variant: "success",
+      });
+      router.push("/dashboard");
+    } catch (err) {
+      toast({
+        title: "登录失败",
+        description: err instanceof Error ? err.message : "请检查用户名和密码",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            项目健康监控系统
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            登录您的账户
-          </p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 p-4">
+      <div className="w-full max-w-md">
+        <div className="flex justify-center mb-8">
+          <Link href="/" className="flex items-center space-x-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/25">
+              <Activity className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <span className="text-2xl font-bold">Health Monitor</span>
+          </Link>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="flex">
-                <AlertCircle className="h-5 w-5 text-red-400" />
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">{error}</h3>
-                </div>
+        <Card className="border shadow-xl">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold text-center">欢迎回来</CardTitle>
+            <CardDescription className="text-center">
+              请输入您的账号信息以继续
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">用户名</Label>
+                <Input
+                  id="username"
+                  placeholder="请输入用户名"
+                  {...register("username")}
+                  className={errors.username ? "border-destructive" : ""}
+                />
+                {errors.username && (
+                  <p className="text-sm text-destructive">{errors.username.message}</p>
+                )}
               </div>
-            </div>
-          )}
 
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="username" className="sr-only">
-                用户名
-              </label>
-              <input
-                id="username"
-                name="username"
-                type="text"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-brand-500 focus:border-brand-500 focus:z-10 sm:text-sm"
-                placeholder="用户名或邮箱"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-              />
-              {formErrors.username && (
-                <p className="mt-1 text-sm text-red-600">{formErrors.username}</p>
-              )}
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                密码
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-brand-500 focus:border-brand-500 focus:z-10 sm:text-sm"
-                placeholder="密码"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              />
-              {formErrors.password && (
-                <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>
-              )}
-            </div>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">密码</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="请输入密码"
+                    {...register("password")}
+                    className={errors.password ? "border-destructive pr-10" : "pr-10"}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
+                {errors.password && (
+                  <p className="text-sm text-destructive">{errors.password.message}</p>
+                )}
+              </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                className="h-4 w-4 text-brand-600 focus:ring-brand-500 border-gray-300 rounded"
-                checked={formData.rememberMe}
-                onChange={(e) => setFormData({ ...formData, rememberMe: e.target.checked })}
-              />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                记住我
-              </label>
-            </div>
-          </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="rememberMe"
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => setValue("rememberMe", checked as boolean)}
+                  />
+                  <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">
+                    记住我
+                  </Label>
+                </div>
+                <Link
+                  href="#"
+                  className="text-sm text-primary hover:underline"
+                >
+                  忘记密码？
+                </Link>
+              </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-brand-600 hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? '登录中...' : '登录'}
-            </button>
-          </div>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    登录中...
+                  </>
+                ) : (
+                  "登录"
+                )}
+              </Button>
+            </form>
+          </CardContent>
+          <CardFooter className="flex justify-center">
+            <p className="text-sm text-muted-foreground">
+              还没有账号？{" "}
+              <Link href="/register" className="text-primary hover:underline font-medium">
+                立即注册
+              </Link>
+            </p>
+          </CardFooter>
+        </Card>
 
-          <div className="text-center">
-            <Link
-              href="/register"
-              className="font-medium text-brand-600 hover:text-brand-500"
-            >
-              还没有账户？立即注册
-            </Link>
-          </div>
-        </form>
+        <p className="mt-8 text-center text-sm text-muted-foreground">
+          © 2024 Health Monitor. All rights reserved.
+        </p>
       </div>
     </div>
   );

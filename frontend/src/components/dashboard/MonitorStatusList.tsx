@@ -85,7 +85,7 @@ export default function MonitorStatusList({ monitors }: MonitorStatusListProps) 
                       <div className="text-right hidden sm:block">
                         <p>响应时间</p>
                         <p className="font-medium text-gray-900">
-                          {formatResponseTime(monitor.last_response_time)}
+                          {monitor.last_response_time ? formatResponseTime(monitor.last_response_time) : '-'}
                         </p>
                       </div>
                       <div className="text-right">

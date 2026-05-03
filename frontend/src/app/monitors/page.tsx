@@ -1,141 +1,241 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
-import MainLayout from '@/components/layout/MainLayout';
-import { monitorsApi } from '@/lib/api';
-import { Monitor, MonitorStatus, HealthStatus } from '@/types';
-import { formatRelativeTime, formatResponseTime, getStatusLabel, truncateUrl } from '@/lib/utils';
-import { useToastContext } from '@/components/common/ToastProvider';
-import { useDebounce } from '@/hooks/useDebounce';
-import { useThrottle } from '@/hooks/useThrottle';
-import { useAbortableRequest } from '@/hooks/useAbortableRequest';
-import { Plus, Search, Filter, Play, Pause, MoreVertical, Trash2, Edit } from 'lucide-react';
+import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreHorizontal,
+  Play,
+  Pause,
+  Edit,
+  Trash2,
+  Activity,
+  AlertCircle,
+  CheckCircle,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { MainLayout } from "@/components/layout/MainLayout";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { monitorsApi } from "@/lib/api";
+import { Monitor, MonitorStatus, HealthStatus } from "@/types";
+import { formatRelativeTime, cn } from "@/lib/utils";
+
+interface Filters {
+  status: string;
+  health_status: string;
+  keyword: string;
+}
+
+function StatusBadge({ status }: { status: HealthStatus }) {
+  const config = {
+    normal: { label: "正常", variant: "success" as const, icon: CheckCircle },
+    warning: { label: "警告", variant: "warning" as const, icon: AlertTriangle },
+    critical: { label: "严重", variant: "destructive" as const, icon: AlertCircle },
+  };
+
+  const { label, variant, icon: Icon } = config[status] || config.normal;
+
+  return (
+    <Badge variant={variant} className="gap-1">
+      <Icon className="h-3 w-3" />
+      {label}
+    </Badge>
+  );
+}
+
+function MonitorCard({
+  monitor,
+  onPause,
+  onResume,
+  onDelete,
+}: {
+  monitor: Monitor;
+  onPause: (id: string) => void;
+  onResume: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <Card className="group hover:shadow-md transition-all">
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="font-semibold truncate">{monitor.name}</h3>
+              {monitor.status === "paused" && (
+                <Badge variant="secondary">已暂停</Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground truncate mb-4">
+              {monitor.url}
+            </p>
+            <div className="flex items-center gap-4 text-sm">
+              <StatusBadge status={monitor.health_status} />
+              {monitor.response_time && (
+                <span className="text-muted-foreground">
+                  {monitor.response_time}ms
+                </span>
+              )}
+              <span className="text-muted-foreground">
+                {monitor.last_check_at
+                  ? formatRelativeTime(monitor.last_check_at)
+                  : "从未检查"}
+              </span>
+            </div>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/monitors/${monitor.id}`}>
+                  <Activity className="h-4 w-4 mr-2" />
+                  查看详情
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/monitors/${monitor.id}/edit`}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  编辑
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {monitor.status === "active" ? (
+                <DropdownMenuItem onClick={() => onPause(monitor.id)}>
+                  <Pause className="h-4 w-4 mr-2" />
+                  暂停监控
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={() => onResume(monitor.id)}>
+                  <Play className="h-4 w-4 mr-2" />
+                  恢复监控
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => onDelete(monitor.id)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                删除
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function MonitorsPage() {
-  const { success, error } = useToastContext();
-  const { getSignal } = useAbortableRequest();
+  const router = useRouter();
+  const { toast } = useToast();
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    status: '',
-    health_status: '',
-    keyword: '',
+  const [filters, setFilters] = useState<Filters>({
+    status: "",
+    health_status: "",
+    keyword: "",
   });
   const [pagination, setPagination] = useState({
     page: 1,
-    page_size: 20,
+    page_size: 12,
     total: 0,
     total_pages: 0,
   });
-
-  // Debounce keyword filter
-  const debouncedKeyword = useDebounce(filters.keyword, 300);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const fetchMonitors = useCallback(async () => {
     try {
       setLoading(true);
-      const signal = getSignal();
       const response = await monitorsApi.list({
         page: pagination.page,
         page_size: pagination.page_size,
         status: filters.status,
         health_status: filters.health_status,
-        keyword: debouncedKeyword,
-      }, { signal });
+        keyword: filters.keyword,
+      });
       setMonitors(response.items);
       setPagination(response.pagination);
-    } catch (err: any) {
-      if (err.name === 'AbortError' || err.name === 'CanceledError') {
-        // Request was cancelled, ignore error
-        return;
-      }
-      console.error('Failed to fetch monitors:', err);
-      error('获取监控项失败', '请稍后重试');
+    } catch (err) {
+      toast({
+        title: "获取监控列表失败",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.page_size, filters.status, filters.health_status, debouncedKeyword, getSignal, error]);
+  }, [filters, pagination.page, pagination.page_size, toast]);
 
   useEffect(() => {
     fetchMonitors();
   }, [fetchMonitors]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPagination(prev => ({ ...prev, page: 1 }));
-    // Debounced keyword will trigger fetchMonitors automatically
-  };
-
-  // Throttled pause handler (prevent double-click)
-  const handlePause = useThrottle(
-    async (id: string) => {
-      try {
-        await monitorsApi.pause(id);
-        success('监控已暂停', '监控项已成功暂停');
-        fetchMonitors();
-      } catch (err) {
-        console.error('Failed to pause monitor:', err);
-        error('暂停监控失败', '请稍后重试');
-      }
-    },
-    1000
-  );
-
-  // Throttled resume handler
-  const handleResume = useThrottle(
-    async (id: string) => {
-      try {
-        await monitorsApi.resume(id);
-        success('监控已恢复', '监控项已成功恢复');
-        fetchMonitors();
-      } catch (err) {
-        console.error('Failed to resume monitor:', err);
-        error('恢复监控失败', '请稍后重试');
-      }
-    },
-    1000
-  );
-
-  // Throttled delete handler
-  const handleDelete = useThrottle(
-    async (id: string) => {
-      if (!confirm('确定要删除这个监控项吗？')) return;
-      try {
-        await monitorsApi.delete(id);
-        success('监控项已删除', '监控项已成功删除');
-        fetchMonitors();
-      } catch (err) {
-        console.error('Failed to delete monitor:', err);
-        error('删除监控项失败', '请稍后重试');
-      }
-    },
-    1000
-  );
-
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'paused':
-        return 'bg-gray-100 text-gray-800';
-      case 'archived':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  const handlePause = async (id: string) => {
+    try {
+      await monitorsApi.pause(id);
+      toast({ title: "监控已暂停", variant: "success" });
+      fetchMonitors();
+    } catch {
+      toast({ title: "操作失败", variant: "destructive" });
     }
   };
 
-  const getHealthBadgeClass = (status: string) => {
-    switch (status) {
-      case 'normal':
-        return 'bg-green-100 text-green-800';
-      case 'warning':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'critical':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  const handleResume = async (id: string) => {
+    try {
+      await monitorsApi.resume(id);
+      toast({ title: "监控已恢复", variant: "success" });
+      fetchMonitors();
+    } catch {
+      toast({ title: "操作失败", variant: "destructive" });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await monitorsApi.delete(deleteId);
+      toast({ title: "监控已删除", variant: "success" });
+      setDeleteId(null);
+      fetchMonitors();
+    } catch {
+      toast({ title: "删除失败", variant: "destructive" });
     }
   };
 
@@ -144,220 +244,160 @@ export default function MonitorsPage() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl font-bold text-gray-900">监控项</h1>
-          <Link
-            href="/monitors/new"
-            className="btn-primary inline-flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            新建监控项
-          </Link>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">监控项</h1>
+            <p className="text-muted-foreground mt-1">
+              管理您的所有监控任务
+            </p>
+          </div>
+          <Button asChild>
+            <Link href="/monitors/new">
+              <Plus className="h-4 w-4 mr-2" />
+              新建监控
+            </Link>
+          </Button>
         </div>
 
         {/* Filters */}
-        <div className="card">
-          <div className="card-body">
-            <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="搜索监控项..."
-                    className="input pl-10"
-                    value={filters.keyword}
-                    onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
-                  />
-                </div>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="搜索监控项..."
+                  value={filters.keyword}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, keyword: e.target.value }))
+                  }
+                  className="pl-9"
+                />
               </div>
-              <select
-                className="input sm:w-40"
-                value={filters.status}
-                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-              >
-                <option value="">所有状态</option>
-                <option value="active">活跃</option>
-                <option value="paused">暂停</option>
-                <option value="archived">归档</option>
-              </select>
-              <select
-                className="input sm:w-40"
-                value={filters.health_status}
-                onChange={(e) => setFilters({ ...filters, health_status: e.target.value })}
-              >
-                <option value="">所有健康状态</option>
-                <option value="normal">正常</option>
-                <option value="warning">警告</option>
-                <option value="critical">严重</option>
-              </select>
-              <button type="submit" className="btn-secondary">
-                搜索
-              </button>
-            </form>
+              <div className="flex gap-2">
+                <Select
+                  value={filters.status}
+                  onValueChange={(value) =>
+                    setFilters((prev) => ({ ...prev, status: value }))
+                  }
+                >
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="状态" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">全部状态</SelectItem>
+                    <SelectItem value="active">运行中</SelectItem>
+                    <SelectItem value="paused">已暂停</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={filters.health_status}
+                  onValueChange={(value) =>
+                    setFilters((prev) => ({ ...prev, health_status: value }))
+                  }
+                >
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="健康状态" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">全部健康</SelectItem>
+                    <SelectItem value="normal">正常</SelectItem>
+                    <SelectItem value="warning">警告</SelectItem>
+                    <SelectItem value="critical">严重</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Monitors Grid */}
+        {loading ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Skeleton key={i} className="h-40" />
+            ))}
           </div>
-        </div>
-
-        {/* Monitors List */}
-        <div className="card">
-          {loading ? (
-            <div className="p-6">
-              <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex space-x-4 py-3">
-                    <div className="flex-1">
-                      <div className="h-4 bg-gray-200 rounded w-1/4 animate-pulse mb-2" />
-                      <div className="h-3 bg-gray-200 rounded w-1/3 animate-pulse" />
-                    </div>
-                    <div className="h-6 bg-gray-200 rounded w-16 animate-pulse" />
-                    <div className="h-6 bg-gray-200 rounded w-16 animate-pulse" />
-                    <div className="h-4 bg-gray-200 rounded w-20 animate-pulse" />
-                    <div className="h-4 bg-gray-200 rounded w-24 animate-pulse" />
-                    <div className="h-8 bg-gray-200 rounded w-24 animate-pulse" />
-                  </div>
-                ))}
-              </div>
+        ) : monitors.length === 0 ? (
+          <Card className="py-12">
+            <CardContent className="text-center">
+              <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">暂无监控项</h3>
+              <p className="text-muted-foreground mb-4">
+                创建您的第一个监控任务
+              </p>
+              <Button asChild>
+                <Link href="/monitors/new">
+                  <Plus className="h-4 w-4 mr-2" />
+                  新建监控
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {monitors.map((monitor) => (
+                <MonitorCard
+                  key={monitor.id}
+                  monitor={monitor}
+                  onPause={handlePause}
+                  onResume={handleResume}
+                  onDelete={setDeleteId}
+                />
+              ))}
             </div>
-          ) : monitors.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <p>暂无监控项</p>
-              <Link
-                href="/monitors/new"
-                className="text-brand-600 hover:text-brand-500 font-medium mt-2 inline-block"
+
+            {/* Pagination */}
+            {pagination.total_pages > 1 && (
+              <div className="flex items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setPagination((prev) => ({ ...prev, page: prev.page - 1 }))
+                  }
+                  disabled={pagination.page === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  第 {pagination.page} 页，共 {pagination.total_pages} 页
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setPagination((prev) => ({ ...prev, page: prev.page + 1 }))
+                  }
+                  disabled={pagination.page === pagination.total_pages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Delete Confirmation */}
+        <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认删除</AlertDialogTitle>
+              <AlertDialogDescription>
+                此操作将永久删除该监控项及其所有历史数据，无法恢复。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                创建第一个监控项
-              </Link>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      名称
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      状态
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      健康
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      响应时间
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      最后检查
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      操作
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {monitors.map((monitor) => (
-                    <tr key={monitor.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <Link
-                            href={`/monitors/${monitor.id}`}
-                            className="text-sm font-medium text-brand-600 hover:text-brand-500"
-                          >
-                            {monitor.name}
-                          </Link>
-                          <p className="text-xs text-gray-500">
-                            {truncateUrl(monitor.url, 30)}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(monitor.status)}`}>
-                          {getStatusLabel(monitor.status)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getHealthBadgeClass(monitor.health_status)}`}>
-                          {getStatusLabel(monitor.health_status)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatResponseTime(monitor.last_response_time)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {monitor.last_check_at
-                          ? formatRelativeTime(monitor.last_check_at)
-                          : '从未'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end gap-1 sm:gap-2">
-                          {monitor.status === 'active' ? (
-                            <button
-                              onClick={() => handlePause(monitor.id)}
-                              className="p-1 sm:p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-                              title="暂停"
-                            >
-                              <Pause className="h-4 w-4" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleResume(monitor.id)}
-                              className="p-1 sm:p-2 text-gray-400 hover:text-green-600 hover:bg-gray-100 rounded"
-                              title="恢复"
-                            >
-                              <Play className="h-4 w-4" />
-                            </button>
-                          )}
-                          <Link
-                            href={`/monitors/${monitor.id}/edit`}
-                            className="p-1 sm:p-2 text-gray-400 hover:text-brand-600 hover:bg-gray-100 rounded"
-                            title="编辑"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Link>
-                          <button
-                            onClick={() => handleDelete(monitor.id)}
-                            className="p-1 sm:p-2 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded"
-                            title="删除"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Pagination */}
-          {pagination.total_pages > 1 && (
-            <div className="card-body border-t border-gray-200">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-500">
-                  共 {pagination.total} 条记录
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                    disabled={pagination.page === 1}
-                    className="btn-secondary text-sm disabled:opacity-50"
-                  >
-                    上一页
-                  </button>
-                  <span className="text-sm text-gray-600">
-                    {pagination.page} / {pagination.total_pages}
-                  </span>
-                  <button
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                    disabled={pagination.page === pagination.total_pages}
-                    className="btn-secondary text-sm disabled:opacity-50"
-                  >
-                    下一页
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+                删除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>
   );

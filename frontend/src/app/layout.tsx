@@ -1,14 +1,14 @@
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import './globals.css';
-import { ToastProvider } from '@/components/common/ToastProvider';
-import { AuthProvider } from '@/components/auth/AuthProvider';
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { AuthProvider } from "@/components/auth/AuthProvider";
+import { Toaster } from "@/components/ui/toaster";
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: '项目健康监控系统',
-  description: '简单、可靠、实时的项目健康监控平台',
+  title: "Health Monitor - 项目健康监控平台",
+  description: "简单、可靠、实时的项目健康监控平台",
 };
 
 export default function RootLayout({
@@ -20,9 +20,8 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body className={inter.className}>
         <AuthProvider>
-          <ToastProvider>
-            {children}
-          </ToastProvider>
+          {children}
+          <Toaster />
         </AuthProvider>
       </body>
     </html>

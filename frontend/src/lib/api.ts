@@ -13,6 +13,7 @@ import {
   Alert
 } from '@/types';
 import { emitRateLimitError, emitError } from '@/lib/error-events';
+import { ApiException } from '@/lib/error-handler';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -83,17 +84,8 @@ function handleResponse<T>(response: { data: ApiResponse<T> }): T {
   throw new ApiException(data.message, data.code, data.errors);
 }
 
-// Custom API exception
-export class ApiException extends Error {
-  constructor(
-    message: string,
-    public code: number,
-    public errors?: ApiError[]
-  ) {
-    super(message);
-    this.name = 'ApiException';
-  }
-}
+// 重新导出 ApiException 以保持兼容性
+export { ApiException } from '@/lib/error-handler';
 
 // API methods
 export const apiClient = {

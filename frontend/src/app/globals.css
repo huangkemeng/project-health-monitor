@@ -36,34 +36,34 @@
     --theme-name: 'classic';
   }
 
-  /* Linear Theme - 线条现代风格（黑白配色） */
+  /* Linear Theme - 线条现代风格（oklch 黑白配色） */
   [data-theme="linear"] {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
     --radius: 0.375rem;
 
-    /* Status colors */
-    --status-normal: 142 76% 36%;
-    --status-warning: 38 92% 50%;
-    --status-critical: 0 84% 60%;
-    --status-paused: 215 16% 47%;
+    /* Status colors - oklch format */
+    --status-normal: oklch(0.65 0.15 145);
+    --status-warning: oklch(0.75 0.15 80);
+    --status-critical: oklch(0.65 0.2 25);
+    --status-paused: oklch(0.65 0 0);
 
     /* Theme identifier */
     --theme-name: 'linear';
@@ -92,25 +92,25 @@
   }
 
   .dark[data-theme="linear"] {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
   }
 }
 
@@ -177,26 +177,63 @@
   animation: pulse-red 2s infinite;
 }
 
-/* Linear theme specific styles */
+/* Linear theme specific styles - 增强线条感 */
 [data-theme="linear"] {
-  --radius: 0.375rem;
+  --radius: 0.25rem;
 }
 
+/* 更锐利的边角 */
 [data-theme="linear"] .card,
 [data-theme="linear"] [class*="rounded-lg"],
 [data-theme="linear"] [class*="rounded-md"] {
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
 }
 
 [data-theme="linear"] .button,
-[data-theme="linear"] button[class*="rounded"] {
-  border-radius: 0.25rem;
+[data-theme="linear"] button[class*="rounded"],
+[data-theme="linear"] [role="button"] {
+  border-radius: 0.125rem;
 }
 
 [data-theme="linear"] .input,
 [data-theme="linear"] input,
 [data-theme="linear"] textarea,
 [data-theme="linear"] select {
-  border-radius: 0.25rem;
+  border-radius: 0.125rem;
+  border-width: 1px;
+}
+
+/* 更深的边框线条 */
+[data-theme="linear"] .card {
+  border-width: 1px;
+  box-shadow: none;
+}
+
+[data-theme="linear"] .button {
+  border-width: 1px;
+  box-shadow: none;
+}
+
+[data-theme="linear"] .input,
+[data-theme="linear"] input,
+[data-theme="linear"] textarea {
+  border-width: 1px;
+  box-shadow: none;
+}
+
+/* 分隔线更明显 */
+[data-theme="linear"] [class*="separator"],
+[data-theme="linear"] hr {
+  opacity: 0.5;
+}
+
+/* 表格和列表边框 */
+[data-theme="linear"] table,
+[data-theme="linear"] [class*="table"] {
+  border-collapse: collapse;
+}
+
+[data-theme="linear"] td,
+[data-theme="linear"] th {
   border-width: 1px;
 }

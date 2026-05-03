@@ -63,6 +63,7 @@ export interface MonitorResponse {
   last_check_at: Date | null;
   last_response_time: number | null;
   webhook_id: string | null;
+  group_id: string | null;
   webhook?: WebhookResponse;
   stats?: MonitorStats;
   created_at: Date;

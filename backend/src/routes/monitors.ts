@@ -178,6 +178,7 @@ router.get(
         last_check_at: monitor.last_check_at,
         last_response_time: monitor.last_response_time,
         webhook_id: monitor.webhook_id,
+        group_id: monitor.group_id,
         created_at: monitor.created_at,
         updated_at: monitor.updated_at,
         webhook: monitor.webhook_id ? {

@@ -12,6 +12,19 @@ import type { User, UserResponse, LoginAttempt } from '../types';
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCK_DURATION_MINUTES = 15;
 
+// Helper function to get client IP address
+function getClientIp(req: Request): string | null {
+  // Get IP from X-Forwarded-For header (when behind reverse proxy)
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    // X-Forwarded-For can contain multiple IPs, take the first one
+    const ips = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+    return ips.split(',')[0].trim();
+  }
+  // Fall back to req.ip or socket remote address
+  return req.ip || req.socket.remoteAddress || null;
+}
+
 const router = Router();
 
 // Register
@@ -165,7 +178,7 @@ router.post(
 
       const { username, password, remember_me } = req.body;
       const sanitizedUsername = sanitizeString(username);
-      const ipAddress = req.ip || req.socket.remoteAddress || null;
+      const ipAddress = getClientIp(req);
 
       // Find user by username or email first (before lock check)
       const user = await queryOne<User>(

@@ -62,6 +62,12 @@ api.interceptors.response.use(
         localStorage.removeItem('user');
         window.location.href = '/login';
       }
+    } else if (error.response?.status === 403) {
+      // 403 Forbidden - 账号锁定等权限错误
+      const message = error.response.data?.message || '访问被拒绝';
+      const forbiddenError = new Error(message);
+      forbiddenError.name = 'ForbiddenError';
+      return Promise.reject(forbiddenError);
     } else if (error.response?.status === 429) {
       // Rate limit exceeded - show user-friendly message
       const message = error.response.data?.message || '请求过于频繁，请稍后再试';

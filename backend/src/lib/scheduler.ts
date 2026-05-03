@@ -40,14 +40,36 @@ async function sendCronFailureAlert(errorMessage: string, jobLogId: string): Pro
   const hasAll = atUsersList.some(u => u.toLowerCase() === 'all');
   const individualUsers = atUsersList.filter(u => u.toLowerCase() !== 'all');
   
-  // For Feishu/Lark: <@userid> format
-  // For WeChat Work: @all in text or mentioned_list
+  // Build mentioned_list for WeChat Work (supports @all and userids)
+  const mentionedList: string[] = [];
+  if (hasAll) {
+    mentionedList.push('@all');
+  }
+  mentionedList.push(...individualUsers);
+  
+  // For Feishu/Lark: <@userid> format in markdown
+  // For WeChat Work: use mentioned_list in text type when @all is needed
   const atContent = individualUsers.length > 0
     ? individualUsers.map(p => `<@${p}>`).join(' ')
     : '';
-  const atAllText = hasAll ? '@all' : '';
 
-  const message = {
+  // Use text type for WeChat Work with @all, otherwise use markdown
+  const isWeChatWork = hasAll && mentionedList.length > 0;
+  
+  const message = isWeChatWork ? {
+    msgtype: 'text',
+    text: {
+      content: `【系统告警】定时任务执行失败
+
+任务类型: 健康检查定时任务
+失败原因: ${errorMessage}
+日志ID: ${jobLogId}
+时间: ${new Date().toLocaleString('zh-CN')}
+
+请立即检查系统状态！`,
+      mentioned_list: mentionedList
+    }
+  } : {
     msgtype: 'markdown',
     markdown: {
       content: `<font color="warning">【系统告警】定时任务执行失败</font>
@@ -58,7 +80,7 @@ async function sendCronFailureAlert(errorMessage: string, jobLogId: string): Pro
 > **时间**: ${new Date().toLocaleString('zh-CN')}
 
 请立即检查系统状态！
-${atAllText} ${atContent}`
+${atContent}`
     }
   };
 
@@ -338,14 +360,38 @@ async function sendAlertNotification(
   const hasAll = atUsersList.some(u => u.toLowerCase() === 'all');
   const individualUsers = atUsersList.filter(u => u.toLowerCase() !== 'all');
   
-  // For Feishu/Lark: <@userid> format
-  // For WeChat Work: @all in text or mentioned_list
+  // Build mentioned_list for WeChat Work (supports @all and userids)
+  const mentionedList: string[] = [];
+  if (hasAll) {
+    mentionedList.push('@all');
+  }
+  mentionedList.push(...individualUsers);
+  
+  // For Feishu/Lark: <@userid> format in markdown
+  // For WeChat Work: use mentioned_list in text type when @all is needed
   const atContent = individualUsers.length > 0
     ? individualUsers.map(p => `<@${p}>`).join(' ')
     : '';
-  const atAllText = hasAll ? '@all' : '';
 
-  const alertMessage = {
+  // Use text type for WeChat Work with @all, otherwise use markdown
+  const isWeChatWork = hasAll && mentionedList.length > 0;
+  
+  const alertMessage = isWeChatWork ? {
+    msgtype: 'text',
+    text: {
+      content: `【${level === 'critical' ? '严重告警' : '警告'}】${monitor.name}
+
+监控项: ${monitor.name}
+所属分组: ${groupName}
+告警级别: ${level === 'critical' ? '严重' : '警告'}
+详细信息: ${message}
+时间: ${new Date().toLocaleString('zh-CN')}
+URL: ${monitor.url}
+
+请尽快检查！`,
+      mentioned_list: mentionedList
+    }
+  } : {
     msgtype: 'markdown',
     markdown: {
       content: `<font color="${color}">【${level === 'critical' ? '严重告警' : '警告'}】${monitor.name}</font>
@@ -353,13 +399,12 @@ async function sendAlertNotification(
 > **监控项**: ${monitor.name}
 > **所属分组**: ${groupName}
 > **告警级别**: ${level === 'critical' ? '严重' : '警告'}
-> **告警类型**: 服务异常
 > **详细信息**: ${message}
 > **时间**: ${new Date().toLocaleString('zh-CN')}
 > **URL**: ${monitor.url}
 
 请尽快检查！
-${atAllText} ${atContent}`
+${atContent}`
     }
   };
 
@@ -400,14 +445,37 @@ async function sendRecoveryNotification(monitor: Monitor): Promise<void> {
   const hasAll = atUsersList.some(u => u.toLowerCase() === 'all');
   const individualUsers = atUsersList.filter(u => u.toLowerCase() !== 'all');
   
-  // For Feishu/Lark: <@userid> format
-  // For WeChat Work: @all in text or mentioned_list
+  // Build mentioned_list for WeChat Work (supports @all and userids)
+  const mentionedList: string[] = [];
+  if (hasAll) {
+    mentionedList.push('@all');
+  }
+  mentionedList.push(...individualUsers);
+  
+  // For Feishu/Lark: <@userid> format in markdown
+  // For WeChat Work: use mentioned_list in text type when @all is needed
   const atContent = individualUsers.length > 0
     ? individualUsers.map(p => `<@${p}>`).join(' ')
     : '';
-  const atAllText = hasAll ? '@all' : '';
 
-  const recoveryMessage = {
+  // Use text type for WeChat Work with @all, otherwise use markdown
+  const isWeChatWork = hasAll && mentionedList.length > 0;
+  
+  const recoveryMessage = isWeChatWork ? {
+    msgtype: 'text',
+    text: {
+      content: `【恢复通知】${monitor.name}
+
+监控项: ${monitor.name}
+所属分组: ${groupName}
+状态: 已恢复正常
+时间: ${new Date().toLocaleString('zh-CN')}
+URL: ${monitor.url}
+
+服务已恢复正常！`,
+      mentioned_list: mentionedList
+    }
+  } : {
     msgtype: 'markdown',
     markdown: {
       content: `<font color="info">【恢复通知】${monitor.name}</font>
@@ -419,7 +487,7 @@ async function sendRecoveryNotification(monitor: Monitor): Promise<void> {
 > **URL**: ${monitor.url}
 
 服务已恢复正常！
-${atAllText} ${atContent}`
+${atContent}`
     }
   };
 

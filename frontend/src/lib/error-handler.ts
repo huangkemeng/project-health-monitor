@@ -26,11 +26,15 @@ export class ApiException extends Error {
 
 export function getErrorMessage(error: unknown): string {
   // 优先处理 ApiException，获取字段级错误信息
-  if (error instanceof ApiException) {
-    if (error.errors && error.errors.length > 0) {
-      return error.errors.map(e => e.message).join('\n');
+  // 同时检查 name 属性以防止 instanceof 判断失败
+  if (error instanceof ApiException || (error instanceof Error && error.name === 'ApiException')) {
+    const apiError = error as ApiException;
+    if (apiError.errors && apiError.errors.length > 0) {
+      return apiError.errors.map(e => e.message).join('\n');
     }
-    return error.message;
+    if (apiError.message) {
+      return apiError.message;
+    }
   }
 
   // 处理 AxiosError，尝试从响应中提取字段级错误
@@ -44,15 +48,15 @@ export function getErrorMessage(error: unknown): string {
       return responseData.message;
     }
   }
-  
+
   if (error instanceof Error) {
     return error.message;
   }
-  
+
   if (typeof error === 'string') {
     return error;
   }
-  
+
   return '发生未知错误，请稍后重试';
 }
 

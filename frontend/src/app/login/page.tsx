@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
+import { useApiError } from "@/hooks/use-api-error";
 import { useAuth } from "@/hooks/useAuth";
 
 const loginSchema = z.object({
@@ -26,16 +26,16 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
-  const { toast } = useToast();
+  const { handleError, handleSuccess } = useApiError();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
     setValue,
     watch,
+    formState: { errors },
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -49,18 +49,10 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await login(data.username, data.password);
-      toast({
-        title: "登录成功",
-        description: "欢迎回来！",
-        variant: "success",
-      });
+      handleSuccess("登录成功", "欢迎回来！");
       router.push("/dashboard");
     } catch (err) {
-      toast({
-        title: "登录失败",
-        description: err instanceof Error ? err.message : "请检查用户名和密码",
-        variant: "destructive",
-      });
+      handleError(err, "登录失败");
     } finally {
       setIsLoading(false);
     }

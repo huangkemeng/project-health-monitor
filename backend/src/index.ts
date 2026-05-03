@@ -52,10 +52,16 @@ app.use(cors({
   credentials: true
 }));
 
-// Apply rate limiting to all API routes
-app.use('/api/', limiter);
+// Apply rate limiting to all API routes except auth logout
+app.use('/api/', (req, res, next) => {
+  // Skip rate limiting for logout endpoint
+  if (req.path === '/auth/logout') {
+    return next();
+  }
+  return limiter(req, res, next);
+});
 
-// Apply stricter rate limiting to auth routes
+// Apply stricter rate limiting to auth routes (login/register only)
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 

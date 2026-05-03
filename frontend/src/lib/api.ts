@@ -55,6 +55,13 @@ api.interceptors.response.use(
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
+    } else if (error.response?.status === 429) {
+      // Rate limit exceeded - show user-friendly message
+      const message = error.response.data?.message || '请求过于频繁，请稍后再试';
+      // Create a custom error with the message from backend
+      const rateLimitError = new Error(message);
+      rateLimitError.name = 'RateLimitError';
+      return Promise.reject(rateLimitError);
     }
     return Promise.reject(error);
   }

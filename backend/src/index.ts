@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { getDbHealth } from './lib/db';
 import { autoMigrate } from './lib/db/auto-migrate';
+import { startScheduler, stopScheduler } from './lib/scheduler';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -102,13 +103,36 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, async () => {
+const server = app.listen(PORT, async () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
   // Run database auto-migration on startup
   console.log('[Server] Running database migrations...');
   await autoMigrate();
+
+  // Start the health check scheduler
+  console.log('[Server] Starting health check scheduler...');
+  startScheduler();
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('[Server] SIGTERM received, shutting down gracefully...');
+  stopScheduler();
+  server.close(() => {
+    console.log('[Server] Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('[Server] SIGINT received, shutting down gracefully...');
+  stopScheduler();
+  server.close(() => {
+    console.log('[Server] Server closed');
+    process.exit(0);
+  });
 });
 
 export default app;

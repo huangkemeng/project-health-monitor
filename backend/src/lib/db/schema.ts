@@ -1,11 +1,4 @@
 export const createTablesSQL = `
--- Create database if not exists
-CREATE DATABASE IF NOT EXISTS health_monitor 
-  CHARACTER SET utf8mb4 
-  COLLATE utf8mb4_unicode_ci;
-
-USE health_monitor;
-
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
   id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
@@ -17,6 +10,23 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uk_username (username),
   UNIQUE KEY uk_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Monitor groups table (must be created before monitors)
+CREATE TABLE IF NOT EXISTS monitor_groups (
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  owner_id CHAR(36) NOT NULL,
+  name VARCHAR(50) NOT NULL,
+  description VARCHAR(200),
+  color VARCHAR(7) DEFAULT '#3B82F6',
+  sort_order INT DEFAULT 0,
+  is_default BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE KEY uk_owner_group_name (owner_id, name),
+  INDEX idx_groups_owner (owner_id),
+  INDEX idx_groups_sort_order (sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Webhooks table
@@ -141,23 +151,6 @@ CREATE TABLE IF NOT EXISTS cron_job_logs (
   INDEX idx_cron_logs_status (status),
   INDEX idx_cron_logs_started (started_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Monitor groups table (for organizing monitors)
-CREATE TABLE IF NOT EXISTS monitor_groups (
-  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-  owner_id CHAR(36) NOT NULL,
-  name VARCHAR(50) NOT NULL,
-  description VARCHAR(200),
-  color VARCHAR(7) DEFAULT '#3B82F6',
-  sort_order INT DEFAULT 0,
-  is_default BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
-  UNIQUE KEY uk_owner_group_name (owner_id, name),
-  INDEX idx_groups_owner (owner_id),
-  INDEX idx_groups_sort_order (sort_order)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 `;
 
 export const dropTablesSQL = `
@@ -167,7 +160,7 @@ DROP TABLE IF EXISTS alert_silences;
 DROP TABLE IF EXISTS alerts;
 DROP TABLE IF EXISTS check_logs;
 DROP TABLE IF EXISTS monitors;
-DROP TABLE IF EXISTS monitor_groups;
 DROP TABLE IF EXISTS webhooks;
+DROP TABLE IF EXISTS monitor_groups;
 DROP TABLE IF EXISTS users;
 `;

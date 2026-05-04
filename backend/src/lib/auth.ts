@@ -1,17 +1,18 @@
 import { SignJWT, jwtVerify } from 'jose';
 import type { JwtPayload } from '../types';
 
-// Validate JWT_SECRET on startup
-const jwtSecret = process.env.JWT_SECRET;
-if (!jwtSecret) {
-  console.error('ERROR: JWT_SECRET environment variable is not set!');
-  console.error('Please set a secure random string (at least 32 characters) for JWT_SECRET');
-  process.exit(1);
-}
-
-const JWT_SECRET = new TextEncoder().encode(jwtSecret);
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h'; // Default: 24 hours for non-remember me
 const JWT_EXPIRES_IN_REMEMBER = process.env.JWT_EXPIRES_IN_REMEMBER || '30d'; // 30 days for remember me
+
+// Get JWT_SECRET at runtime to handle Vercel environment
+function getJwtSecret(): Uint8Array {
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    console.error('ERROR: JWT_SECRET environment variable is not set!');
+    throw new Error('JWT_SECRET is not configured');
+  }
+  return new TextEncoder().encode(jwtSecret);
+}
 
 /**
  * Generate JWT token for user
@@ -22,6 +23,7 @@ export async function generateToken(
   payload: { userId: string; username: string; email: string },
   rememberMe: boolean = false
 ): Promise<string> {
+  const JWT_SECRET = getJwtSecret();
   const expirationTime = rememberMe ? JWT_EXPIRES_IN_REMEMBER : JWT_EXPIRES_IN;
   const token = await new SignJWT({ userId: payload.userId, username: payload.username, email: payload.email })
     .setProtectedHeader({ alg: 'HS256' })
@@ -37,6 +39,7 @@ export async function generateToken(
  */
 export async function verifyToken(token: string): Promise<JwtPayload | null> {
   try {
+    const JWT_SECRET = getJwtSecret();
     const { payload } = await jwtVerify(token, JWT_SECRET);
     return payload as unknown as JwtPayload;
   } catch (error) {

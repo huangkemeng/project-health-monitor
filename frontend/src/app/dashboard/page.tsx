@@ -124,13 +124,18 @@ function MonitorList({ monitors, loading }: { monitors: DashboardMonitorItem[]; 
           <div className="flex items-center gap-3">
             <StatusDot status={monitor.health_status} />
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-medium group-hover:text-primary transition-colors">
                   {monitor.name}
                 </p>
                 {monitor.group_name && (
                   <Badge variant="outline" className="text-xs">
                     {monitor.group_name}
+                  </Badge>
+                )}
+                {monitor.is_own_project === false && monitor.owner_username && (
+                  <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
+                    @{monitor.owner_username}
                   </Badge>
                 )}
               </div>
@@ -203,6 +208,11 @@ function AlertList({ alerts, loading, totalAlerts = 0 }: { alerts: Alert[]; load
               {alert.group_name && (
                 <Badge variant="outline" className="text-xs">
                   {alert.group_name}
+                </Badge>
+              )}
+              {alert.is_own_project === false && alert.owner_username && (
+                <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
+                  @{alert.owner_username}
                 </Badge>
               )}
             </div>

@@ -187,6 +187,10 @@ export interface AlertResponse {
   // 权限相关字段
   is_own_project?: boolean;
   role?: CollaboratorRole | null;
+  // 所有者信息
+  owner_id?: string;
+  owner_username?: string;
+  owner_email?: string;
 }
 
 // API Response Types
@@ -232,6 +236,10 @@ export interface DashboardMonitorItem {
   // 权限相关字段
   is_own_project?: boolean;
   role?: CollaboratorRole | null;
+  // 所有者信息
+  owner_id?: string;
+  owner_username?: string;
+  owner_email?: string;
 }
 
 export interface DashboardStats {

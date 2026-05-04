@@ -17,6 +17,18 @@ router.get('/', authenticate, async (req, res) => {
     const { getAccessibleProjects } = await import('../services/collaboration');
     const accessibleProjects = await getAccessibleProjects(userId, userEmail);
 
+    // Get owner info for all projects
+    const ownerIds = accessibleProjects.map(p => p.ownerId);
+    let ownerInfoMap = new Map<string, { username: string; email: string }>();
+    if (ownerIds.length > 0) {
+      const placeholders = ownerIds.map(() => '?').join(',');
+      const ownerInfo = await query<{ id: string; username: string; email: string }>(
+        `SELECT id, username, email FROM users WHERE id IN (${placeholders})`,
+        ownerIds
+      );
+      ownerInfo.forEach(o => ownerInfoMap.set(o.id, { username: o.username, email: o.email }));
+    }
+
     // Aggregate data from all accessible projects
     let totalMonitors = 0;
     let normalMonitors = 0;
@@ -28,6 +40,8 @@ router.get('/', authenticate, async (req, res) => {
     const allMonitorItems: DashboardMonitorItem[] = [];
 
     for (const project of accessibleProjects) {
+      const ownerInfo = ownerInfoMap.get(project.ownerId) || { username: '', email: '' };
+
       // Build group filter for collaborators
       let groupFilter = '';
       const queryParams: any[] = [project.ownerId];
@@ -92,7 +106,12 @@ router.get('/', authenticate, async (req, res) => {
         ended_at: a.ended_at,
         duration: a.duration,
         send_status: a.send_status,
-        created_at: a.created_at
+        created_at: a.created_at,
+        is_own_project: project.isOwner,
+        role: project.role,
+        owner_id: project.ownerId,
+        owner_username: ownerInfo.username,
+        owner_email: ownerInfo.email
       })));
 
       // Get active monitors with latest status and group info
@@ -120,7 +139,10 @@ router.get('/', authenticate, async (req, res) => {
         last_response_time: m.last_response_time,
         group_name: m.group_name,
         is_own_project: project.isOwner,
-        role: project.role
+        role: project.role,
+        owner_id: project.ownerId,
+        owner_username: ownerInfo.username,
+        owner_email: ownerInfo.email
       })));
     }
 

@@ -243,6 +243,12 @@ export interface Alert {
   send_status: SendStatus;
   message?: string;
   created_at: string;
+  // 所有者信息
+  is_own_project?: boolean;
+  role?: CollaboratorRole | null;
+  owner_id?: string;
+  owner_username?: string;
+  owner_email?: string;
 }
 
 export interface AlertResponse extends Alert {}
@@ -300,6 +306,12 @@ export interface DashboardMonitorItem {
   last_response_time: number | null;
   response_time?: number | null;
   group_name?: string | null;
+  // 所有者信息
+  is_own_project?: boolean;
+  role?: CollaboratorRole | null;
+  owner_id?: string;
+  owner_username?: string;
+  owner_email?: string;
 }
 
 export interface DashboardSummary {

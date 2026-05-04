@@ -27,6 +27,7 @@ export function SharedProjectList({ onSwitchProject }: SharedProjectListProps) {
   const [loading, setLoading] = useState(true);
   const [rejecting, setRejecting] = useState<string | null>(null);
 
+  // 加载项目的回调函数
   const loadProjects = useCallback(async () => {
     try {
       setLoading(true);
@@ -41,11 +42,12 @@ export function SharedProjectList({ onSwitchProject }: SharedProjectListProps) {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, []); // 不依赖 toast，避免无限循环
 
+  // 只在组件挂载时加载一次
   useEffect(() => {
     loadProjects();
-  }, [loadProjects]);
+  }, []);
 
   const handleReject = async (project: SharedProject) => {
     if (!confirm(`确定要拒绝 ${project.owner_username} 的共享项目吗？`)) {
@@ -101,13 +103,14 @@ export function SharedProjectList({ onSwitchProject }: SharedProjectListProps) {
           </Badge>
         );
       default:
-        return <Badge variant="outline">{role}</Badge>;
+        return null;
     }
   };
 
-  const getGroupDisplay = (groupName: string | null) => {
-    if (!groupName) return <span className="text-muted-foreground">所有分组</span>;
-    return groupName;
+  const getGroupName = (groupId: string | null) => {
+    if (!groupId) return '所有分组';
+    if (groupId === 'ungrouped') return '未分组';
+    return '指定分组';
   };
 
   if (loading) {
@@ -115,7 +118,7 @@ export function SharedProjectList({ onSwitchProject }: SharedProjectListProps) {
       <Card>
         <CardHeader>
           <CardTitle>共享项目</CardTitle>
-          <CardDescription>他人与您共享的监控项目</CardDescription>
+          <CardDescription>管理您被邀请的共享项目</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center h-32">
@@ -131,10 +134,11 @@ export function SharedProjectList({ onSwitchProject }: SharedProjectListProps) {
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle>共享项目</CardTitle>
-          <CardDescription>他人与您共享的监控项目</CardDescription>
+          <CardDescription>管理您被邀请的共享项目</CardDescription>
         </div>
-        <Button variant="outline" size="icon" onClick={loadProjects} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+        <Button variant="outline" size="sm" onClick={loadProjects}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          刷新
         </Button>
       </CardHeader>
       <CardContent>
@@ -150,43 +154,39 @@ export function SharedProjectList({ onSwitchProject }: SharedProjectListProps) {
               <TableRow>
                 <TableHead>项目所有者</TableHead>
                 <TableHead>邮箱</TableHead>
-                <TableHead>我的权限</TableHead>
+                <TableHead>您的权限</TableHead>
                 <TableHead>可访问分组</TableHead>
                 <TableHead>加入时间</TableHead>
-                <TableHead className="w-[200px]">操作</TableHead>
+                <TableHead className="w-[100px]">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {projects.map((project) => (
                 <TableRow key={project.owner_id}>
-                  <TableCell className="font-medium">
-                    {project.owner_username}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {project.owner_email}
-                  </TableCell>
+                  <TableCell className="font-medium">{project.owner_username}</TableCell>
+                  <TableCell>{project.owner_email}</TableCell>
                   <TableCell>{getRoleBadge(project.role)}</TableCell>
-                  <TableCell>{getGroupDisplay(project.group_name)}</TableCell>
+                  <TableCell>{getGroupName(project.group_id)}</TableCell>
                   <TableCell>
                     {new Date(project.joined_at).toLocaleDateString('zh-CN')}
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
                       <Button
+                        variant="ghost"
                         size="sm"
                         onClick={() => handleSwitch(project)}
                       >
-                        <FolderOpen className="mr-2 h-4 w-4" />
-                        查看项目
+                        切换
                       </Button>
                       <Button
+                        variant="ghost"
                         size="sm"
-                        variant="outline"
                         onClick={() => handleReject(project)}
                         disabled={rejecting === project.owner_id}
+                        className="text-red-600 hover:text-red-700"
                       >
-                        <XCircle className="mr-2 h-4 w-4" />
-                        {rejecting === project.owner_id ? '处理中...' : '拒绝'}
+                        <XCircle className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>

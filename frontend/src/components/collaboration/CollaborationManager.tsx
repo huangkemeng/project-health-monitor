@@ -61,6 +61,7 @@ export function CollaborationManager() {
   const [editGroupId, setEditGroupId] = useState<string>('all');
   const [updating, setUpdating] = useState(false);
 
+  // 加载数据的回调函数
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -79,11 +80,12 @@ export function CollaborationManager() {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, []); // 不依赖 toast，避免无限循环
 
+  // 只在组件挂载时加载一次
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, []);
 
   const handleInvite = async () => {
     if (!inviteEmail.trim()) {
@@ -298,18 +300,22 @@ export function CollaborationManager() {
             <TableHeader>
               <TableRow>
                 <TableHead>邮箱</TableHead>
+                <TableHead>用户名</TableHead>
                 <TableHead>权限</TableHead>
                 <TableHead>可访问分组</TableHead>
                 <TableHead>状态</TableHead>
-                <TableHead>添加时间</TableHead>
-                <TableHead className="w-[100px]">操作</TableHead>
+                <TableHead>加入时间</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {collaborators.map((collaborator) => (
                 <TableRow key={collaborator.id}>
-                  <TableCell className="font-medium">
-                    {collaborator.collaborator_email}
+                  <TableCell>{collaborator.collaborator_email}</TableCell>
+                  <TableCell>
+                    {collaborator.collaborator_username || (
+                      <span className="text-muted-foreground">未注册</span>
+                    )}
                   </TableCell>
                   <TableCell>{getRoleBadge(collaborator.role)}</TableCell>
                   <TableCell>{getGroupName(collaborator.group_id)}</TableCell>
@@ -317,7 +323,7 @@ export function CollaborationManager() {
                     {collaborator.status === 'active' ? (
                       <Badge variant="default" className="bg-green-500">活跃</Badge>
                     ) : (
-                      <Badge variant="destructive">已拒绝</Badge>
+                      <Badge variant="secondary">待接受</Badge>
                     )}
                   </TableCell>
                   <TableCell>
@@ -337,7 +343,7 @@ export function CollaborationManager() {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleRemove(collaborator)}
-                          className="text-destructive"
+                          className="text-red-600"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           移除

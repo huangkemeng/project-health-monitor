@@ -23,6 +23,7 @@ export function ProjectSwitcher() {
   const [loading, setLoading] = useState(true);
   const [switching, setSwitching] = useState(false);
 
+  // 加载项目的回调函数
   const loadProjects = useCallback(async () => {
     try {
       setLoading(true);
@@ -45,11 +46,12 @@ export function ProjectSwitcher() {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, []); // 不依赖 toast，避免无限循环
 
+  // 只在组件挂载时加载一次
   useEffect(() => {
     loadProjects();
-  }, [loadProjects]);
+  }, []);
 
   const handleSwitchProject = async (project: SharedProject) => {
     if (project.owner_id === currentProject?.owner_id) {

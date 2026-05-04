@@ -119,7 +119,7 @@ router.post(
       
       console.log('Token generated successfully');
 
-      // Return user without password
+      // Return user without password (match frontend expected format)
       const userResponse: UserResponse = {
         id: newUser.id,
         username: newUser.username,
@@ -127,7 +127,8 @@ router.post(
         created_at: newUser.created_at
       };
 
-      created(res, { user: userResponse, token });
+      // Return format matching frontend expectation: { id, username, email, created_at, token }
+      created(res, { ...userResponse, token });
     } catch (err) {
       console.error('Registration error:', err);
       console.error('Error details:', err instanceof Error ? err.message : String(err));

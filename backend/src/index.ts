@@ -136,6 +136,34 @@ app.get('/health/detailed', (req, res) => {
   });
 });
 
+// Test bcrypt endpoint
+import { hashPassword, comparePassword } from './lib/password';
+app.get('/test/bcrypt', async (req, res) => {
+  try {
+    const testPassword = 'Test123456';
+    const start = Date.now();
+    const hashed = await hashPassword(testPassword);
+    const hashTime = Date.now() - start;
+    
+    const compareStart = Date.now();
+    const isValid = await comparePassword(testPassword, hashed);
+    const compareTime = Date.now() - compareStart;
+    
+    res.json({
+      success: true,
+      hashTime: `${hashTime}ms`,
+      compareTime: `${compareTime}ms`,
+      isValid,
+      hashedLength: hashed.length
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : String(err)
+    });
+  }
+});
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/webhooks', webhookRoutes);

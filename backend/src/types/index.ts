@@ -68,6 +68,10 @@ export interface MonitorResponse {
   stats?: MonitorStats;
   created_at: Date;
   updated_at: Date;
+  // 权限相关字段
+  owner_id?: string;
+  is_own_project?: boolean;
+  role?: CollaboratorRole | null;
 }
 
 export interface MonitorStats {

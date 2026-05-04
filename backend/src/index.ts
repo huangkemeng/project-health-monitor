@@ -50,14 +50,12 @@ const authLimiter = rateLimit({
 // Trust proxy - required for getting real client IP behind reverse proxy
 app.set('trust proxy', 1);
 
-// CORS configuration - support multiple origins
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'https://health-monitor-3wt6didtn-huangkemengs-projects.vercel.app',
-  'https://health-monitor.bin01.com',
-  process.env.FRONTEND_URL,
-].filter(Boolean); // Remove undefined values
+// CORS configuration - support multiple origins from environment variable
+// FRONTEND_URL can contain multiple domains separated by commas
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+  .split(',')
+  .map(url => url.trim())
+  .filter(Boolean);
 
 // Middleware
 app.use(cors({

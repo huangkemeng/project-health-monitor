@@ -239,6 +239,7 @@ export interface DashboardData {
 export interface JwtPayload {
   userId: string;
   username: string;
+  email: string;
   iat: number;
   exp: number;
 }
@@ -273,4 +274,59 @@ export interface JwtPayload {
 // Authenticated Request
 export interface AuthenticatedRequest extends Express.Request {
   user?: JwtPayload;
+}
+
+// ============================================
+// Collaboration Types
+// ============================================
+
+export type CollaboratorRole = 'viewer' | 'editor';
+export type CollaboratorStatus = 'active' | 'rejected';
+
+export interface ProjectCollaborator {
+  id: string;
+  project_owner_id: string;
+  collaborator_email: string;
+  collaborator_user_id: string | null;
+  group_id: string | null;
+  role: CollaboratorRole;
+  status: CollaboratorStatus;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface ProjectCollaboratorResponse {
+  id: string;
+  collaborator_email: string;
+  collaborator_username?: string;
+  group_id: string | null;
+  group_name?: string | null;
+  role: CollaboratorRole;
+  status: CollaboratorStatus;
+  created_at: Date;
+}
+
+export interface ProjectRejection {
+  id: string;
+  user_id: string;
+  project_owner_id: string;
+  rejected_at: Date;
+}
+
+export interface SharedProject {
+  owner_id: string;
+  owner_username: string;
+  owner_email: string;
+  role: CollaboratorRole | 'owner';
+  group_id: string | null;
+  group_name: string | null;
+  joined_at: Date;
+}
+
+// Permission check result
+export interface PermissionCheckResult {
+  isOwner: boolean;
+  isCollaborator: boolean;
+  role: CollaboratorRole | null;
+  accessibleGroupIds: string[] | null; // null means all groups
 }

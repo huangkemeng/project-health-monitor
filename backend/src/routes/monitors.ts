@@ -3,16 +3,20 @@ import { body, param, query as queryValidator, validationResult } from 'express-
 import { v4 as uuidv4 } from 'uuid';
 import { query, queryOne, execute } from '../lib/db';
 import { authenticate } from '../middleware/auth';
-import { success, error, created, validationError, notFound } from '../utils/api-response';
+import { projectContext, checkProjectPermission, requireRole } from '../middleware/permission';
+import { success, error, created, validationError, notFound, forbidden } from '../utils/api-response';
+import { buildGroupFilter, canAccessMonitor } from '../utils/data-isolation';
 import { isValidUrl, isValidHttpMethod, safeJsonParse, sanitizeString, sanitizeSearchKeyword } from '../utils/validators';
 import type { Monitor, MonitorResponse, Webhook, CheckLog, MonitorStats, HttpMethod, Alert } from '../types';
 
 const router = Router();
 
-// Get all monitors for current user
+// Get all monitors for current user (or project context)
 router.get(
   '/',
   authenticate,
+  projectContext(),
+  checkProjectPermission,
   [
     queryValidator('page').optional().isInt({ min: 1 }),
     queryValidator('page_size').optional().isInt({ min: 1, max: 100 }),
@@ -48,9 +52,22 @@ router.get(
 
       const offset = (page - 1) * pageSize;
 
+      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+
       // Build query conditions
       const conditions: string[] = ['m.owner_id = ?'];
-      const values: (string | number)[] = [req.user!.userId];
+      const values: (string | number)[] = [ownerId];
+
+      // Apply group filter for collaborators
+      if (!isOwner && accessibleGroupIds !== null) {
+        if (accessibleGroupIds.length === 0) {
+          conditions.push('m.group_id IS NULL');
+        } else {
+          const placeholders = accessibleGroupIds.map(() => '?').join(',');
+          conditions.push(`(m.group_id IS NULL OR m.group_id IN (${placeholders}))`);
+          values.push(...accessibleGroupIds);
+        }
+      }
 
       if (status) {
         conditions.push('m.status = ?');
@@ -63,6 +80,15 @@ router.get(
       }
 
       if (groupId) {
+        // Check if collaborator has access to this group
+        if (!isOwner && accessibleGroupIds !== null) {
+          if (!accessibleGroupIds.includes(groupId)) {
+            return success(res, {
+              items: [],
+              pagination: { page, page_size: pageSize, total: 0, total_pages: 0 }
+            });
+          }
+        }
         conditions.push('m.group_id = ?');
         values.push(groupId);
       }
@@ -116,6 +142,8 @@ router.get(
 router.get(
   '/:id',
   authenticate,
+  projectContext(),
+  checkProjectPermission,
   [
     param('id').isUUID()
   ],
@@ -128,7 +156,15 @@ router.get(
       }
 
       const { id } = req.params;
-      const userId = req.user!.userId;
+      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+
+      // Check if collaborator has access to this monitor
+      if (!isOwner) {
+        const hasAccess = await canAccessMonitor(id, ownerId, accessibleGroupIds);
+        if (!hasAccess) {
+          return forbidden(res, '您没有权限访问此监控项');
+        }
+      }
 
       const monitor = await queryOne<Monitor & { webhook_name?: string; webhook_url?: string; at_users?: string | null; is_default?: boolean; webhook_created_at?: Date; webhook_updated_at?: Date }>(
         `SELECT m.*,
@@ -137,7 +173,7 @@ router.get(
          FROM monitors m
          LEFT JOIN webhooks w ON m.webhook_id = w.id
          WHERE m.id = ? AND m.owner_id = ?`,
-        [id, userId]
+        [id, ownerId]
       );
 
       if (!monitor) {
@@ -211,6 +247,9 @@ router.get(
 router.post(
   '/',
   authenticate,
+  projectContext(),
+  checkProjectPermission,
+  requireRole('editor'),
   [
     body('name').trim().isLength({ min: 1, max: 50 }),
     body('url').isURL(),
@@ -245,6 +284,8 @@ router.post(
         group_id
       } = req.body;
 
+      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+
       // Validate URL format
       if (!isValidUrl(url)) {
         validationError(res, [{ field: 'url', message: 'URL 格式不正确' }]);
@@ -261,7 +302,7 @@ router.post(
       if (webhook_id) {
         const webhook = await queryOne<Webhook>(
           'SELECT * FROM webhooks WHERE id = ? AND owner_id = ?',
-          [webhook_id, req.user!.userId]
+          [webhook_id, ownerId]
         );
         if (!webhook) {
           validationError(res, [{ field: 'webhook_id', message: 'Webhook 不存在' }]);
@@ -272,9 +313,13 @@ router.post(
       // Validate group_id if provided
       let finalGroupId = group_id;
       if (group_id) {
+        // Check if collaborator has access to this group
+        if (!isOwner && accessibleGroupIds !== null && !accessibleGroupIds.includes(group_id)) {
+          return forbidden(res, '您没有权限在此分组中创建监控项');
+        }
         const group = await queryOne(
           'SELECT * FROM monitor_groups WHERE id = ? AND owner_id = ?',
-          [group_id, req.user!.userId]
+          [group_id, ownerId]
         );
         if (!group) {
           validationError(res, [{ field: 'group_id', message: '分组不存在' }]);
@@ -283,7 +328,7 @@ router.post(
       } else {
         // Get or create default group
         const { getOrCreateDefaultGroup } = await import('./groups');
-        const defaultGroup = await getOrCreateDefaultGroup(req.user!.userId);
+        const defaultGroup = await getOrCreateDefaultGroup(ownerId);
         finalGroupId = defaultGroup.id;
       }
 
@@ -296,7 +341,7 @@ router.post(
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 'normal', 0, ?, NOW(), NOW())`,
         [
           monitorId,
-          req.user!.userId,
+          ownerId,
           finalGroupId,
           sanitizeString(name),
           url,
@@ -325,6 +370,9 @@ router.post(
 router.put(
   '/:id',
   authenticate,
+  projectContext(),
+  checkProjectPermission,
+  requireRole('editor'),
   [
     param('id').isUUID(),
     body('name').optional().trim().isLength({ min: 1, max: 50 }),
@@ -346,12 +394,20 @@ router.put(
       }
 
       const { id } = req.params;
-      const userId = req.user!.userId;
+      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+
+      // Check if collaborator has access to this monitor
+      if (!isOwner) {
+        const hasAccess = await canAccessMonitor(id, ownerId, accessibleGroupIds);
+        if (!hasAccess) {
+          return forbidden(res, '您没有权限更新此监控项');
+        }
+      }
 
       // Check if monitor exists and belongs to user
       const existingMonitor = await queryOne<Monitor>(
         'SELECT * FROM monitors WHERE id = ? AND owner_id = ?',
-        [id, userId]
+        [id, ownerId]
       );
 
       if (!existingMonitor) {
@@ -390,7 +446,7 @@ router.put(
       if (webhook_id) {
         const webhook = await queryOne<Webhook>(
           'SELECT * FROM webhooks WHERE id = ? AND owner_id = ?',
-          [webhook_id, userId]
+          [webhook_id, ownerId]
         );
         if (!webhook) {
           validationError(res, [{ field: 'webhook_id', message: 'Webhook 不存在' }]);
@@ -400,9 +456,13 @@ router.put(
 
       // Validate group_id if provided
       if (group_id) {
+        // Check if collaborator has access to target group
+        if (!isOwner && accessibleGroupIds !== null && !accessibleGroupIds.includes(group_id)) {
+          return forbidden(res, '您没有权限将监控项移动到此分组');
+        }
         const group = await queryOne(
           'SELECT * FROM monitor_groups WHERE id = ? AND owner_id = ?',
-          [group_id, userId]
+          [group_id, ownerId]
         );
         if (!group) {
           validationError(res, [{ field: 'group_id', message: '分组不存在' }]);
@@ -464,7 +524,7 @@ router.put(
       }
 
       values.push(id);
-      values.push(userId);
+      values.push(ownerId);
 
       await execute(
         `UPDATE monitors SET ${updates.join(', ')} WHERE id = ? AND owner_id = ?`,
@@ -484,6 +544,9 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
+  projectContext(),
+  checkProjectPermission,
+  requireRole('editor'),
   [
     param('id').isUUID()
   ],
@@ -496,12 +559,20 @@ router.delete(
       }
 
       const { id } = req.params;
-      const userId = req.user!.userId;
+      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+
+      // Check if collaborator has access to this monitor
+      if (!isOwner) {
+        const hasAccess = await canAccessMonitor(id, ownerId, accessibleGroupIds);
+        if (!hasAccess) {
+          return forbidden(res, '您没有权限删除此监控项');
+        }
+      }
 
       // Check if monitor exists and belongs to user
       const existingMonitor = await queryOne<Monitor>(
         'SELECT * FROM monitors WHERE id = ? AND owner_id = ?',
-        [id, userId]
+        [id, ownerId]
       );
 
       if (!existingMonitor) {
@@ -514,7 +585,7 @@ router.delete(
       await execute('DELETE FROM alerts WHERE monitor_id = ?', [id]);
 
       // Delete monitor
-      await execute('DELETE FROM monitors WHERE id = ? AND owner_id = ?', [id, userId]);
+      await execute('DELETE FROM monitors WHERE id = ? AND owner_id = ?', [id, ownerId]);
 
       success(res, { message: '监控项已删除' });
     } catch (err) {
@@ -528,6 +599,9 @@ router.delete(
 router.post(
   '/:id/pause',
   authenticate,
+  projectContext(),
+  checkProjectPermission,
+  requireRole('editor'),
   [
     param('id').isUUID()
   ],
@@ -540,11 +614,19 @@ router.post(
       }
 
       const { id } = req.params;
-      const userId = req.user!.userId;
+      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+
+      // Check if collaborator has access to this monitor
+      if (!isOwner) {
+        const hasAccess = await canAccessMonitor(id, ownerId, accessibleGroupIds);
+        if (!hasAccess) {
+          return forbidden(res, '您没有权限暂停此监控项');
+        }
+      }
 
       const monitor = await queryOne<Monitor>(
         'SELECT * FROM monitors WHERE id = ? AND owner_id = ?',
-        [id, userId]
+        [id, ownerId]
       );
 
       if (!monitor) {
@@ -577,6 +659,9 @@ router.post(
 router.post(
   '/:id/resume',
   authenticate,
+  projectContext(),
+  checkProjectPermission,
+  requireRole('editor'),
   [
     param('id').isUUID()
   ],
@@ -589,11 +674,19 @@ router.post(
       }
 
       const { id } = req.params;
-      const userId = req.user!.userId;
+      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+
+      // Check if collaborator has access to this monitor
+      if (!isOwner) {
+        const hasAccess = await canAccessMonitor(id, ownerId, accessibleGroupIds);
+        if (!hasAccess) {
+          return forbidden(res, '您没有权限恢复此监控项');
+        }
+      }
 
       const monitor = await queryOne<Monitor>(
         'SELECT * FROM monitors WHERE id = ? AND owner_id = ?',
-        [id, userId]
+        [id, ownerId]
       );
 
       if (!monitor) {
@@ -618,6 +711,8 @@ router.post(
 router.post(
   '/:id/check',
   authenticate,
+  projectContext(),
+  checkProjectPermission,
   [
     param('id').isUUID()
   ],
@@ -630,12 +725,20 @@ router.post(
       }
 
       const { id } = req.params;
-      const userId = req.user!.userId;
+      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+
+      // Check if collaborator has access to this monitor
+      if (!isOwner) {
+        const hasAccess = await canAccessMonitor(id, ownerId, accessibleGroupIds);
+        if (!hasAccess) {
+          return forbidden(res, '您没有权限检查此监控项');
+        }
+      }
 
       // Check if monitor exists and belongs to user
       const monitor = await queryOne<Monitor>(
         'SELECT * FROM monitors WHERE id = ? AND owner_id = ?',
-        [id, userId]
+        [id, ownerId]
       );
 
       if (!monitor) {

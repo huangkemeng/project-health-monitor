@@ -2,7 +2,9 @@ import { Router, Request, Response } from 'express';
 import { query as queryValidator, validationResult } from 'express-validator';
 import { query, queryOne } from '../lib/db';
 import { authenticate } from '../middleware/auth';
-import { success, error, validationError } from '../utils/api-response';
+import { projectContext, checkProjectPermission } from '../middleware/permission';
+import { success, error, validationError, forbidden } from '../utils/api-response';
+import { canAccessMonitor } from '../utils/data-isolation';
 import type { CheckLog, Alert, CheckLogResponse, AlertResponse } from '../types';
 
 const router = Router();
@@ -11,6 +13,8 @@ const router = Router();
 router.get(
   '/checks',
   authenticate,
+  projectContext(),
+  checkProjectPermission,
   [
     queryValidator('monitor_id').optional().isUUID(),
     queryValidator('status').optional().isIn(['success', 'failure']),
@@ -36,9 +40,30 @@ router.get(
 
       const offset = (page - 1) * pageSize;
 
+      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+
+      // If specific monitor requested, check access
+      if (monitorId && !isOwner) {
+        const hasAccess = await canAccessMonitor(monitorId, ownerId, accessibleGroupIds);
+        if (!hasAccess) {
+          return forbidden(res, '您没有权限查看此监控项的历史记录');
+        }
+      }
+
       // Build query conditions
       const conditions: string[] = ['m.owner_id = ?'];
-      const values: (string | number)[] = [req.user!.userId];
+      const values: (string | number)[] = [ownerId];
+
+      // Apply group filter for collaborators
+      if (!isOwner && accessibleGroupIds !== null) {
+        if (accessibleGroupIds.length === 0) {
+          conditions.push('m.group_id IS NULL');
+        } else {
+          const placeholders = accessibleGroupIds.map(() => '?').join(',');
+          conditions.push(`(m.group_id IS NULL OR m.group_id IN (${placeholders}))`);
+          values.push(...accessibleGroupIds);
+        }
+      }
 
       if (monitorId) {
         conditions.push('cl.monitor_id = ?');
@@ -116,6 +141,8 @@ router.get(
 router.get(
   '/alerts',
   authenticate,
+  projectContext(),
+  checkProjectPermission,
   [
     queryValidator('monitor_id').optional().isUUID(),
     queryValidator('status').optional().isIn(['firing', 'resolved']),
@@ -141,9 +168,30 @@ router.get(
 
       const offset = (page - 1) * pageSize;
 
+      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+
+      // If specific monitor requested, check access
+      if (monitorId && !isOwner) {
+        const hasAccess = await canAccessMonitor(monitorId, ownerId, accessibleGroupIds);
+        if (!hasAccess) {
+          return forbidden(res, '您没有权限查看此监控项的告警');
+        }
+      }
+
       // Build query conditions
       const conditions: string[] = ['m.owner_id = ?'];
-      const values: (string | number)[] = [req.user!.userId];
+      const values: (string | number)[] = [ownerId];
+
+      // Apply group filter for collaborators
+      if (!isOwner && accessibleGroupIds !== null) {
+        if (accessibleGroupIds.length === 0) {
+          conditions.push('m.group_id IS NULL');
+        } else {
+          const placeholders = accessibleGroupIds.map(() => '?').join(',');
+          conditions.push(`(m.group_id IS NULL OR m.group_id IN (${placeholders}))`);
+          values.push(...accessibleGroupIds);
+        }
+      }
 
       if (monitorId) {
         conditions.push('a.monitor_id = ?');

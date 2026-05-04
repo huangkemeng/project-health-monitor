@@ -15,6 +15,9 @@ import groupRoutes from './routes/groups';
 import dashboardRoutes from './routes/dashboard';
 import historyRoutes from './routes/history';
 import cronRoutes from './routes/cron';
+import collaboratorsRoutes from './routes/collaborators';
+import sharedProjectsRoutes from './routes/shared-projects';
+import projectsRoutes from './routes/projects';
 
 dotenv.config();
 
@@ -172,6 +175,9 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/cron', cronRoutes);
+app.use('/api/collaborators', collaboratorsRoutes);
+app.use('/api/shared-projects', sharedProjectsRoutes);
+app.use('/api/projects', projectsRoutes);
 
 // Error handling
 app.use(notFoundHandler);

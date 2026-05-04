@@ -1,8 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { authenticate } from '../middleware/auth';
+import { projectContext, checkProjectPermission, requireRole } from '../middleware/permission';
 import { execute, query } from '../lib/db';
-import { success, created } from '../utils/api-response';
+import { success, created, forbidden } from '../utils/api-response';
 import { ValidationError, NotFoundError, ConflictError } from '../utils/errors';
 
 const router = Router();
@@ -70,13 +71,28 @@ export async function getOrCreateDefaultGroup(userId: string): Promise<Group> {
   };
 }
 
-// Get all groups for current user
-router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+// Get all groups for current user (or project context)
+router.get('/', authenticate, projectContext(), checkProjectPermission, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user!.userId;
+    const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
 
     // Ensure default group exists
-    await getOrCreateDefaultGroup(userId);
+    await getOrCreateDefaultGroup(ownerId);
+
+    // Build group filter for collaborators
+    let groupFilter = '';
+    const queryParams: any[] = [ownerId];
+
+    if (!isOwner && accessibleGroupIds !== null) {
+      if (accessibleGroupIds.length === 0) {
+        // 只能访问未分组监控项
+        groupFilter = 'AND g.is_default = TRUE';
+      } else {
+        const placeholders = accessibleGroupIds.map(() => '?').join(',');
+        groupFilter = `AND (g.is_default = TRUE OR g.id IN (${placeholders}))`;
+        queryParams.push(...accessibleGroupIds);
+      }
+    }
 
     // Get all groups with monitor counts and health summary
     const groups = await query(
@@ -95,10 +111,10 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
         SUM(CASE WHEN m.health_status = 'critical' THEN 1 ELSE 0 END) as critical_count
       FROM monitor_groups g
       LEFT JOIN monitors m ON m.group_id = g.id AND m.status = 'active'
-      WHERE g.owner_id = ?
+      WHERE g.owner_id = ? ${groupFilter}
       GROUP BY g.id
       ORDER BY g.is_default DESC, g.sort_order ASC, g.updated_at DESC`,
-      [userId]
+      queryParams
     );
 
     const formattedGroups = groups.map((g: any) => ({
@@ -125,10 +141,25 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
 });
 
 // Get single group by ID
-router.get('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', authenticate, projectContext(), checkProjectPermission, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user!.userId;
+    const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
     const { id } = req.params;
+
+    // Check if collaborator has access to this group
+    if (!isOwner && accessibleGroupIds !== null) {
+      // 默认分组总是可以访问
+      const isDefaultGroup = await query(
+        'SELECT is_default FROM monitor_groups WHERE id = ? AND owner_id = ?',
+        [id, ownerId]
+      );
+      
+      if (isDefaultGroup.length === 0 || !(isDefaultGroup[0] as any).is_default) {
+        if (!accessibleGroupIds.includes(id)) {
+          return forbidden(res, '您没有权限访问此分组');
+        }
+      }
+    }
 
     const groups = await query(
       `SELECT
@@ -141,7 +172,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
       LEFT JOIN monitors m ON m.group_id = g.id AND m.status = 'active'
       WHERE g.id = ? AND g.owner_id = ?
       GROUP BY g.id`,
-      [id, userId]
+      [id, ownerId]
     );
 
     if (!groups || groups.length === 0) {
@@ -171,9 +202,9 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
 });
 
 // Create new group
-router.post('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', authenticate, projectContext(), checkProjectPermission, requireRole('editor'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user!.userId;
+    const { ownerId } = req.projectContext!;
     const { name, description, color } = req.body;
 
     // Validation
@@ -192,7 +223,7 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
     // Check group count limit
     const countResult = await query(
       'SELECT COUNT(*) as count FROM monitor_groups WHERE owner_id = ?',
-      [userId]
+      [ownerId]
     );
 
     if ((countResult[0] as any).count >= 50) {
@@ -202,7 +233,7 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
     // Check name uniqueness
     const existing = await query(
       'SELECT id FROM monitor_groups WHERE owner_id = ? AND name = ?',
-      [userId, name.trim()]
+      [ownerId, name.trim()]
     );
 
     if (existing && existing.length > 0) {
@@ -212,7 +243,7 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
     // Get max sort_order
     const maxSortResult = await query(
       'SELECT MAX(sort_order) as max_sort FROM monitor_groups WHERE owner_id = ?',
-      [userId]
+      [ownerId]
     );
     const sortOrder = ((maxSortResult[0] as any).max_sort || 0) + 1;
 
@@ -225,7 +256,7 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
     await execute(
       `INSERT INTO monitor_groups (id, owner_id, name, description, color, sort_order)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, userId, name.trim(), description || null, groupColor, sortOrder]
+      [id, ownerId, name.trim(), description || null, groupColor, sortOrder]
     );
 
     const newGroup = await query(
@@ -252,16 +283,23 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
 });
 
 // Update group
-router.put('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', authenticate, projectContext(), checkProjectPermission, requireRole('editor'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user!.userId;
+    const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
     const { id } = req.params;
     const { name, description, color } = req.body;
+
+    // Check if collaborator has access to this group
+    if (!isOwner && accessibleGroupIds !== null) {
+      if (!accessibleGroupIds.includes(id)) {
+        return forbidden(res, '您没有权限修改此分组');
+      }
+    }
 
     // Check if group exists and belongs to user
     const existing = await query(
       'SELECT * FROM monitor_groups WHERE id = ? AND owner_id = ?',
-      [id, userId]
+      [id, ownerId]
     );
 
     if (!existing || existing.length === 0) {
@@ -288,7 +326,7 @@ router.put('/:id', authenticate, async (req: Request, res: Response, next: NextF
       // Check name uniqueness (excluding current group)
       const nameCheck = await query(
         'SELECT id FROM monitor_groups WHERE owner_id = ? AND name = ? AND id != ?',
-        [userId, name.trim(), id]
+        [ownerId, name.trim(), id]
       );
 
       if (nameCheck && nameCheck.length > 0) {
@@ -368,15 +406,22 @@ router.put('/:id', authenticate, async (req: Request, res: Response, next: NextF
 });
 
 // Delete group
-router.delete('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', authenticate, projectContext(), checkProjectPermission, requireRole('editor'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user!.userId;
+    const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
     const { id } = req.params;
+
+    // Check if collaborator has access to this group
+    if (!isOwner && accessibleGroupIds !== null) {
+      if (!accessibleGroupIds.includes(id)) {
+        return forbidden(res, '您没有权限删除此分组');
+      }
+    }
 
     // Check if group exists and belongs to user
     const existing = await query(
       'SELECT * FROM monitor_groups WHERE id = ? AND owner_id = ?',
-      [id, userId]
+      [id, ownerId]
     );
 
     if (!existing || existing.length === 0) {
@@ -389,7 +434,7 @@ router.delete('/:id', authenticate, async (req: Request, res: Response, next: Ne
     }
 
     // Get default group ID
-    const defaultGroup = await getOrCreateDefaultGroup(userId);
+    const defaultGroup = await getOrCreateDefaultGroup(ownerId);
 
     // Move monitors to default group
     await execute(
@@ -407,9 +452,9 @@ router.delete('/:id', authenticate, async (req: Request, res: Response, next: Ne
 });
 
 // Move monitors to group
-router.post('/:id/monitors', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/monitors', authenticate, projectContext(), checkProjectPermission, requireRole('editor'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user!.userId;
+    const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
     const { id } = req.params;
     const { monitor_ids } = req.body;
 
@@ -421,25 +466,42 @@ router.post('/:id/monitors', authenticate, async (req: Request, res: Response, n
       throw new ValidationError('一次最多移动100个监控项');
     }
 
+    // Check if collaborator has access to target group
+    if (!isOwner && accessibleGroupIds !== null) {
+      if (!accessibleGroupIds.includes(id)) {
+        return forbidden(res, '您没有权限将监控项移动到此分组');
+      }
+    }
+
     // Check if group exists and belongs to user
     const group = await query(
       'SELECT id FROM monitor_groups WHERE id = ? AND owner_id = ?',
-      [id, userId]
+      [id, ownerId]
     );
 
     if (!group || group.length === 0) {
       throw new NotFoundError('分组不存在');
     }
 
-    // Check if monitors belong to user
+    // Check if monitors belong to user and are accessible
     const placeholders = monitor_ids.map(() => '?').join(',');
     const monitors = await query(
-      `SELECT id FROM monitors WHERE id IN (${placeholders}) AND owner_id = ?`,
-      [...monitor_ids, userId]
+      `SELECT id, group_id FROM monitors WHERE id IN (${placeholders}) AND owner_id = ?`,
+      [...monitor_ids, ownerId]
     );
 
     if (monitors.length !== monitor_ids.length) {
       throw new ValidationError('部分监控项不存在或无权限');
+    }
+
+    // Check if collaborator has access to source groups
+    if (!isOwner && accessibleGroupIds !== null) {
+      for (const monitor of monitors) {
+        const monitorGroupId = (monitor as any).group_id;
+        if (monitorGroupId !== null && !accessibleGroupIds.includes(monitorGroupId)) {
+          return forbidden(res, '您没有权限移动部分监控项');
+        }
+      }
     }
 
     // Update monitors
@@ -455,18 +517,32 @@ router.post('/:id/monitors', authenticate, async (req: Request, res: Response, n
 });
 
 // Get monitors in group
-router.get('/:id/monitors', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id/monitors', authenticate, projectContext(), checkProjectPermission, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user!.userId;
+    const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
     const { id } = req.params;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = (page - 1) * limit;
 
+    // Check if collaborator has access to this group
+    if (!isOwner && accessibleGroupIds !== null) {
+      const isDefaultGroup = await query(
+        'SELECT is_default FROM monitor_groups WHERE id = ? AND owner_id = ?',
+        [id, ownerId]
+      );
+      
+      if (isDefaultGroup.length === 0 || !(isDefaultGroup[0] as any).is_default) {
+        if (!accessibleGroupIds.includes(id)) {
+          return forbidden(res, '您没有权限访问此分组');
+        }
+      }
+    }
+
     // Check if group exists and belongs to user
     const group = await query(
       'SELECT id FROM monitor_groups WHERE id = ? AND owner_id = ?',
-      [id, userId]
+      [id, ownerId]
     );
 
     if (!group || group.length === 0) {
@@ -483,12 +559,12 @@ router.get('/:id/monitors', authenticate, async (req: Request, res: Response, ne
       WHERE m.group_id = ? AND m.owner_id = ?
       ORDER BY m.updated_at DESC
       LIMIT ? OFFSET ?`,
-      [id, userId, limit, offset]
+      [id, ownerId, limit, offset]
     );
 
     const countResult = await query(
       'SELECT COUNT(*) as total FROM monitors WHERE group_id = ? AND owner_id = ?',
-      [id, userId]
+      [id, ownerId]
     );
 
     const total = (countResult[0] as any).total;

@@ -311,3 +311,49 @@ export interface UptimeData {
   date: string;
   uptime: number;
 }
+
+// Collaboration Types
+export type CollaboratorRole = 'viewer' | 'editor';
+export type CollaboratorStatus = 'active' | 'rejected';
+
+export interface Collaborator {
+  id: string;
+  collaborator_email: string;
+  collaborator_username?: string;
+  group_id: string | null;
+  group_name?: string | null;
+  role: CollaboratorRole;
+  status: CollaboratorStatus;
+  created_at: string;
+}
+
+export interface SharedProject {
+  owner_id: string;
+  owner_username: string;
+  owner_email: string;
+  role: CollaboratorRole | 'owner';
+  group_id: string | null;
+  group_name: string | null;
+  joined_at: string;
+  is_own_project?: boolean;
+}
+
+export interface ProjectContext {
+  owner_id: string;
+  owner_username: string;
+  owner_email: string;
+  role: CollaboratorRole | 'owner';
+  accessible_groups?: { id: string; name: string }[];
+  is_own_project: boolean;
+}
+
+export interface CreateCollaboratorData {
+  email: string;
+  role: CollaboratorRole;
+  group_id?: string | null;
+}
+
+export interface UpdateCollaboratorData {
+  role?: CollaboratorRole;
+  group_id?: string | null;
+}

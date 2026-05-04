@@ -12,7 +12,12 @@ import {
   CheckLog,
   Alert,
   MonitorGroup,
-  CreateGroupData
+  CreateGroupData,
+  Collaborator,
+  SharedProject,
+  ProjectContext,
+  CreateCollaboratorData,
+  UpdateCollaboratorData
 } from '@/types';
 import { emitRateLimitError, emitError } from '@/lib/error-events';
 import { ApiException } from '@/lib/error-handler';
@@ -235,6 +240,39 @@ export const groupsApi = {
 
   moveMonitors: (groupId: string, monitorIds: string[], config?: AxiosRequestConfig) =>
     apiClient.post<{ moved_count: number }>(`/groups/${groupId}/monitors`, { monitor_ids: monitorIds }, config),
+};
+
+// Collaboration API
+export const collaborationApi = {
+  // Collaborators
+  listCollaborators: (config?: AxiosRequestConfig) =>
+    apiClient.get<{ items: Collaborator[] }>('/collaborators', config),
+
+  inviteCollaborator: (data: CreateCollaboratorData, config?: AxiosRequestConfig) =>
+    apiClient.post<Collaborator>('/collaborators', data, config),
+
+  updateCollaborator: (id: string, data: UpdateCollaboratorData, config?: AxiosRequestConfig) =>
+    apiClient.put<Collaborator>(`/collaborators/${id}`, data, config),
+
+  removeCollaborator: (id: string, config?: AxiosRequestConfig) =>
+    apiClient.delete(`/collaborators/${id}`, config),
+
+  // Shared Projects
+  listSharedProjects: (config?: AxiosRequestConfig) =>
+    apiClient.get<SharedProject[]>('/shared-projects', config),
+
+  rejectProject: (ownerId: string, config?: AxiosRequestConfig) =>
+    apiClient.post(`/shared-projects/${ownerId}/reject`, {}, config),
+
+  // Projects
+  listProjects: (config?: AxiosRequestConfig) =>
+    apiClient.get<{ projects: SharedProject[]; current_project: { owner_id: string; owner_email: string; is_own: boolean } }>('/projects', config),
+
+  switchProject: (ownerId: string, config?: AxiosRequestConfig) =>
+    apiClient.post<{ project: ProjectContext; message: string }>('/projects/switch', { owner_id: ownerId }, config),
+
+  getCurrentProject: (config?: AxiosRequestConfig) =>
+    apiClient.get<{ project: ProjectContext }>('/projects/current', config),
 };
 
 export default api;

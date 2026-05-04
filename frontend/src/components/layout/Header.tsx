@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Bell, Menu, User, LogOut, Settings, History, Webhook } from "lucide-react";
+import { Activity, Bell, Menu, User, LogOut, Settings, History, Webhook, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
+import { ProjectSwitcher } from "@/components/collaboration/ProjectSwitcher";
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -72,6 +73,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         </nav>
 
         <div className="flex flex-1 items-center justify-end gap-3">
+          <ProjectSwitcher />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -92,6 +94,12 @@ export function Header({ onMenuClick }: HeaderProps) {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/collaboration" className="cursor-pointer">
+                  <Users className="mr-2 h-4 w-4" />
+                  项目协作
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/settings" className="cursor-pointer">
                   <Settings className="mr-2 h-4 w-4" />

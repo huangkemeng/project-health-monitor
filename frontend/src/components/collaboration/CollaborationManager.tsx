@@ -40,7 +40,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { MoreHorizontal, Plus, Trash2, UserCog, Mail } from 'lucide-react';
 import { collaborationApi, groupsApi } from '@/lib/api';
-import { Collaborator, CollaboratorRole, CollaboratorStatus, MonitorGroup } from '@/types';
+import { Collaborator, CollaboratorRole, MonitorGroup } from '@/types';
 
 export function CollaborationManager() {
   const { toast } = useToast();
@@ -178,31 +178,6 @@ export function CollaborationManager() {
     }
   };
 
-  const handleReinvite = async (collaborator: Collaborator) => {
-    if (!confirm(`确定要重新邀请 ${collaborator.collaborator_email} 吗？`)) {
-      return;
-    }
-
-    try {
-      await collaborationApi.inviteCollaborator({
-        email: collaborator.collaborator_email,
-        role: collaborator.role,
-        groupIds: collaborator.groups?.map(g => g.group_id) || null,
-      });
-      toast({
-        title: '重新邀请成功',
-        description: `已向 ${collaborator.collaborator_email} 发送邀请`,
-      });
-      loadData();
-    } catch (error: any) {
-      toast({
-        title: '邀请失败',
-        description: error.message || '无法发送邀请',
-        variant: 'destructive',
-      });
-    }
-  };
-
   const openEditDialog = (collaborator: Collaborator) => {
     setSelectedCollaborator(collaborator);
     setEditRole(collaborator.role);
@@ -220,19 +195,6 @@ export function CollaborationManager() {
         return <Badge variant="secondary">查看者</Badge>;
       default:
         return <Badge variant="outline">{role}</Badge>;
-    }
-  };
-
-  const getStatusBadge = (status: CollaboratorStatus) => {
-    switch (status) {
-      case 'active':
-        return <Badge variant="default" className="bg-green-500">活跃</Badge>;
-      case 'rejected':
-        return <Badge variant="destructive">已拒绝</Badge>;
-      case 'removed':
-        return <Badge variant="secondary">已移除</Badge>;
-      default:
-        return <Badge variant="outline">待接受</Badge>;
     }
   };
 
@@ -390,7 +352,6 @@ export function CollaborationManager() {
                 <TableHead>用户名</TableHead>
                 <TableHead>权限</TableHead>
                 <TableHead>可访问分组</TableHead>
-                <TableHead>状态</TableHead>
                 <TableHead>加入时间</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
@@ -406,44 +367,30 @@ export function CollaborationManager() {
                   </TableCell>
                   <TableCell>{getRoleBadge(collaborator.role)}</TableCell>
                   <TableCell>{getGroupNames(collaborator.groups)}</TableCell>
-                  <TableCell>{getStatusBadge(collaborator.status)}</TableCell>
                   <TableCell>
-                    {collaborator.status === 'removed' && collaborator.updated_at
-                      ? new Date(collaborator.updated_at).toLocaleDateString('zh-CN')
-                      : new Date(collaborator.created_at).toLocaleDateString('zh-CN')}
+                    {new Date(collaborator.created_at).toLocaleDateString('zh-CN')}
                   </TableCell>
                   <TableCell>
-                    {collaborator.status === 'active' ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(collaborator)}>
-                            <UserCog className="mr-2 h-4 w-4" />
-                            修改权限
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleRemove(collaborator)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            撤销邀请
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : collaborator.status === 'rejected' || collaborator.status === 'removed' ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleReinvite(collaborator)}
-                      >
-                        <Mail className="mr-2 h-4 w-4" />
-                        重新邀请
-                      </Button>
-                    ) : null}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEditDialog(collaborator)}>
+                          <UserCog className="mr-2 h-4 w-4" />
+                          修改权限
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleRemove(collaborator)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          撤销邀请
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}

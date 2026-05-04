@@ -134,8 +134,8 @@ function MonitorList({ monitors, loading }: { monitors: DashboardMonitorItem[]; 
                   </Badge>
                 )}
                 {monitor.is_own_project === false && monitor.owner_username && (
-                  <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
-                    @{monitor.owner_username}
+                  <Badge variant="outline" className="text-xs">
+                    来自: {monitor.owner_username}
                   </Badge>
                 )}
               </div>
@@ -211,8 +211,8 @@ function AlertList({ alerts, loading, totalAlerts = 0 }: { alerts: Alert[]; load
                 </Badge>
               )}
               {alert.is_own_project === false && alert.owner_username && (
-                <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
-                  @{alert.owner_username}
+                <Badge variant="outline" className="text-xs">
+                  来自: {alert.owner_username}
                 </Badge>
               )}
             </div>

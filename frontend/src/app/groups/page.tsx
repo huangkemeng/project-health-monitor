@@ -244,10 +244,13 @@ export default function GroupsPage() {
               管理监控项分组，查看各组健康状况
             </p>
           </div>
-          <Button onClick={() => setCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            新建分组
-          </Button>
+          {/* 只有项目所有者可以创建分组 */}
+          {groups.some(g => g.is_own_project) && (
+            <Button onClick={() => setCreateDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              新建分组
+            </Button>
+          )}
         </div>
 
         {/* Statistics Dashboard */}
@@ -384,7 +387,8 @@ export default function GroupsPage() {
                           )}
                         </div>
                       </div>
-                      {!group.is_default && (
+                      {/* 只有所有者或编辑者可以编辑/删除分组，且不能操作默认分组 */}
+                      {!group.is_default && (group.is_own_project || group.role === 'editor') && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -402,13 +406,16 @@ export default function GroupsPage() {
                               <Edit className="h-4 w-4 mr-2" />
                               编辑
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDeleteClick(group)}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              删除
-                            </DropdownMenuItem>
+                            {/* 只有所有者可以删除分组 */}
+                            {group.is_own_project && (
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteClick(group)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                删除
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}

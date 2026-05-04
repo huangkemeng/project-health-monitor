@@ -297,34 +297,44 @@ router.post('/', authenticate, projectContext(), checkProjectPermission, require
 });
 
 // Update group
-router.put('/:id', authenticate, projectContext(), checkProjectPermission, requireRole('editor'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
     const { id } = req.params;
     const { name, description, color } = req.body;
 
-    // Check if collaborator has access to this group
-    if (!isOwner && accessibleGroupIds !== null) {
-      if (!accessibleGroupIds.includes(id)) {
-        return forbidden(res, '您没有权限修改此分组');
-      }
-    }
-
-    // Check if group exists and belongs to user
-    const existing = await query(
-      'SELECT * FROM monitor_groups WHERE id = ? AND owner_id = ?',
-      [id, ownerId]
+    // Get group info first to check ownership
+    const groupInfo = await query(
+      'SELECT owner_id, is_default FROM monitor_groups WHERE id = ?',
+      [id]
     );
 
-    if (!existing || existing.length === 0) {
+    if (!groupInfo || groupInfo.length === 0) {
       throw new NotFoundError('分组不存在');
     }
 
-    const existingGroup = existing[0] as any;
+    const ownerId = (groupInfo[0] as any).owner_id;
+    const isDefault = (groupInfo[0] as any).is_default;
 
-    // Cannot modify default group
-    if (existingGroup.is_default) {
-      throw new ValidationError('默认分组不能修改');
+    // Check permission
+    const { checkProjectPermission } = await import('../services/collaboration');
+    const permission = await checkProjectPermission(userId, userEmail, ownerId);
+
+    if (!permission.isOwner && !permission.isCollaborator) {
+      return forbidden(res, '您没有权限访问此分组');
+    }
+
+    // Only owner or editor can update
+    if (!permission.isOwner && permission.role !== 'editor') {
+      return forbidden(res, '您没有权限修改此分组');
+    }
+
+    // Check if collaborator has access to this specific group
+    if (!permission.isOwner && permission.accessibleGroupIds !== null) {
+      if (!permission.accessibleGroupIds.includes(id)) {
+        return forbidden(res, '您没有权限修改此分组');
+      }
     }
 
     // Validation
@@ -367,7 +377,7 @@ router.put('/:id', authenticate, projectContext(), checkProjectPermission, requi
     }
 
     if (color !== undefined) {
-      const groupColor = DEFAULT_GROUP_COLORS.includes(color) ? color : existingGroup.color;
+      const groupColor = DEFAULT_GROUP_COLORS.includes(color) ? color : DEFAULT_GROUP_COLORS[0];
       updates.push('color = ?');
       values.push(groupColor);
     }
@@ -420,30 +430,40 @@ router.put('/:id', authenticate, projectContext(), checkProjectPermission, requi
 });
 
 // Delete group
-router.delete('/:id', authenticate, projectContext(), checkProjectPermission, requireRole('editor'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
     const { id } = req.params;
 
-    // Check if collaborator has access to this group
-    if (!isOwner && accessibleGroupIds !== null) {
-      if (!accessibleGroupIds.includes(id)) {
-        return forbidden(res, '您没有权限删除此分组');
-      }
-    }
-
-    // Check if group exists and belongs to user
-    const existing = await query(
-      'SELECT * FROM monitor_groups WHERE id = ? AND owner_id = ?',
-      [id, ownerId]
+    // Get group info first to check ownership
+    const groupInfo = await query(
+      'SELECT owner_id, is_default FROM monitor_groups WHERE id = ?',
+      [id]
     );
 
-    if (!existing || existing.length === 0) {
+    if (!groupInfo || groupInfo.length === 0) {
       throw new NotFoundError('分组不存在');
     }
 
+    const ownerId = (groupInfo[0] as any).owner_id;
+    const isDefault = (groupInfo[0] as any).is_default;
+
+    // Check permission
+    const { checkProjectPermission } = await import('../services/collaboration');
+    const permission = await checkProjectPermission(userId, userEmail, ownerId);
+
+    if (!permission.isOwner && !permission.isCollaborator) {
+      return forbidden(res, '您没有权限访问此分组');
+    }
+
+    // Only owner can delete group (collaborators cannot delete even if editor)
+    if (!permission.isOwner) {
+      return forbidden(res, '只有项目所有者可以删除分组');
+    }
+
     // Cannot delete default group
-    if ((existing[0] as any).is_default) {
+    if (isDefault) {
       throw new ValidationError('默认分组不能删除');
     }
 

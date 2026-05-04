@@ -13,29 +13,22 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FolderOpen, XCircle, User, Shield, Eye, RefreshCw, Check } from 'lucide-react';
+import { FolderOpen, XCircle, User, Shield, Eye, RefreshCw } from 'lucide-react';
 import { collaborationApi } from '@/lib/api';
 import { SharedProject, CollaboratorRole } from '@/types';
 
 export function SharedProjectList() {
   const { toast } = useToast();
   const [projects, setProjects] = useState<SharedProject[]>([]);
-  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [rejecting, setRejecting] = useState<string | null>(null);
-  const [switching, setSwitching] = useState<string | null>(null);
 
   // 加载项目的回调函数
   const loadProjects = useCallback(async () => {
     try {
       setLoading(true);
-      // 同时获取共享项目列表和当前项目上下文
-      const [sharedData, projectsData] = await Promise.all([
-        collaborationApi.listSharedProjects(),
-        collaborationApi.listProjects(),
-      ]);
+      const sharedData = await collaborationApi.listSharedProjects();
       setProjects(sharedData || []);
-      setCurrentProjectId(projectsData.current_project?.owner_id || null);
     } catch (error) {
       toast({
         title: '加载失败',
@@ -51,37 +44,6 @@ export function SharedProjectList() {
   useEffect(() => {
     loadProjects();
   }, []);
-
-  const handleSwitch = async (project: SharedProject) => {
-    if (project.owner_id === currentProjectId) {
-      toast({
-        title: '提示',
-        description: '您已经在该项目中',
-      });
-      return;
-    }
-
-    try {
-      setSwitching(project.owner_id);
-      // 保存到 localStorage
-      localStorage.setItem('project_context_owner_id', project.owner_id);
-      setCurrentProjectId(project.owner_id);
-      toast({
-        title: '切换成功',
-        description: `已切换到 ${project.owner_username} 的项目`,
-      });
-      // Reload page to refresh data
-      window.location.reload();
-    } catch (error: any) {
-      toast({
-        title: '切换失败',
-        description: error.message || '无法切换项目',
-        variant: 'destructive',
-      });
-    } finally {
-      setSwitching(null);
-    }
-  };
 
   const handleReject = async (project: SharedProject) => {
     if (!confirm(`确定要拒绝 ${project.owner_username} 的共享项目吗？`)) {
@@ -199,34 +161,16 @@ export function SharedProjectList() {
                     {new Date(project.joined_at).toLocaleDateString('zh-CN')}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant={project.owner_id === currentProjectId ? "secondary" : "ghost"}
-                        size="sm"
-                        onClick={() => handleSwitch(project)}
-                        disabled={switching === project.owner_id}
-                      >
-                        {switching === project.owner_id ? (
-                          <RefreshCw className="h-4 w-4 animate-spin" />
-                        ) : project.owner_id === currentProjectId ? (
-                          <>
-                            <Check className="mr-1 h-4 w-4" />
-                            当前
-                          </>
-                        ) : (
-                          '切换'
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleReject(project)}
-                        disabled={rejecting === project.owner_id}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <XCircle className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleReject(project)}
+                      disabled={rejecting === project.owner_id}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      拒绝
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

@@ -72,69 +72,83 @@ export async function getOrCreateDefaultGroup(userId: string): Promise<Group> {
 }
 
 // Get all groups for current user (or project context)
-router.get('/', authenticate, projectContext(), checkProjectPermission, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
 
-    // Ensure default group exists
-    await getOrCreateDefaultGroup(ownerId);
+    // Get all accessible projects
+    const { getAccessibleProjects } = await import('../services/collaboration');
+    const accessibleProjects = await getAccessibleProjects(userId, userEmail);
 
-    // Build group filter for collaborators
-    let groupFilter = '';
-    const queryParams: any[] = [ownerId];
+    // Ensure default group exists for current user
+    await getOrCreateDefaultGroup(userId);
 
-    if (!isOwner && accessibleGroupIds !== null) {
-      if (accessibleGroupIds.length === 0) {
-        // 只能访问未分组监控项
-        groupFilter = 'AND g.is_default = TRUE';
-      } else {
-        const placeholders = accessibleGroupIds.map(() => '?').join(',');
-        groupFilter = `AND (g.is_default = TRUE OR g.id IN (${placeholders}))`;
-        queryParams.push(...accessibleGroupIds);
+    // Collect all groups from all accessible projects
+    const allGroups: any[] = [];
+
+    for (const project of accessibleProjects) {
+      // Build group filter for this project
+      let groupFilter = '';
+      const queryParams: any[] = [project.ownerId];
+
+      if (!project.isOwner && project.accessibleGroupIds !== null) {
+        if (project.accessibleGroupIds.length === 0) {
+          // 只能访问未分组监控项 - 只返回默认分组
+          groupFilter = 'AND g.is_default = TRUE';
+        } else {
+          const placeholders = project.accessibleGroupIds.map(() => '?').join(',');
+          groupFilter = `AND (g.is_default = TRUE OR g.id IN (${placeholders}))`;
+          queryParams.push(...project.accessibleGroupIds);
+        }
       }
+
+      // Get groups for this project
+      const groups = await query(
+        `SELECT
+          g.id,
+          g.owner_id,
+          g.name,
+          g.description,
+          g.color,
+          g.is_default,
+          g.sort_order,
+          g.created_at,
+          g.updated_at,
+          COUNT(m.id) as monitor_count,
+          SUM(CASE WHEN m.health_status = 'normal' THEN 1 ELSE 0 END) as normal_count,
+          SUM(CASE WHEN m.health_status = 'warning' THEN 1 ELSE 0 END) as warning_count,
+          SUM(CASE WHEN m.health_status = 'critical' THEN 1 ELSE 0 END) as critical_count
+        FROM monitor_groups g
+        LEFT JOIN monitors m ON m.group_id = g.id AND m.status = 'active'
+        WHERE g.owner_id = ? ${groupFilter}
+        GROUP BY g.id
+        ORDER BY g.is_default DESC, g.sort_order ASC, g.updated_at DESC`,
+        queryParams
+      );
+
+      allGroups.push(...groups.map((g: any) => ({
+        id: g.id,
+        owner_id: g.owner_id,
+        name: g.name,
+        description: g.description,
+        color: g.color,
+        is_default: g.is_default === 1,
+        sort_order: g.sort_order,
+        is_own_project: g.owner_id === userId,
+        role: project.role,
+        monitor_count: parseInt(g.monitor_count) || 0,
+        health_summary: {
+          normal: parseInt(g.normal_count) || 0,
+          warning: parseInt(g.warning_count) || 0,
+          critical: parseInt(g.critical_count) || 0
+        },
+        created_at: g.created_at,
+        updated_at: g.updated_at
+      })));
     }
 
-    // Get all groups with monitor counts and health summary
-    const groups = await query(
-      `SELECT
-        g.id,
-        g.name,
-        g.description,
-        g.color,
-        g.is_default,
-        g.sort_order,
-        g.created_at,
-        g.updated_at,
-        COUNT(m.id) as monitor_count,
-        SUM(CASE WHEN m.health_status = 'normal' THEN 1 ELSE 0 END) as normal_count,
-        SUM(CASE WHEN m.health_status = 'warning' THEN 1 ELSE 0 END) as warning_count,
-        SUM(CASE WHEN m.health_status = 'critical' THEN 1 ELSE 0 END) as critical_count
-      FROM monitor_groups g
-      LEFT JOIN monitors m ON m.group_id = g.id AND m.status = 'active'
-      WHERE g.owner_id = ? ${groupFilter}
-      GROUP BY g.id
-      ORDER BY g.is_default DESC, g.sort_order ASC, g.updated_at DESC`,
-      queryParams
-    );
-
-    const formattedGroups = groups.map((g: any) => ({
-      id: g.id,
-      name: g.name,
-      description: g.description,
-      color: g.color,
-      is_default: g.is_default === 1,
-      sort_order: g.sort_order,
-      monitor_count: parseInt(g.monitor_count) || 0,
-      health_summary: {
-        normal: parseInt(g.normal_count) || 0,
-        warning: parseInt(g.warning_count) || 0,
-        critical: parseInt(g.critical_count) || 0
-      },
-      created_at: g.created_at,
-      updated_at: g.updated_at
-    }));
-
-    success(res, { items: formattedGroups, total: formattedGroups.length });
+    success(res, { items: allGroups, total: allGroups.length });
   } catch (error) {
     next(error);
   }

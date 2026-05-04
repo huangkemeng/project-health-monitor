@@ -543,3 +543,51 @@ export async function linkCollaborationsOnRegistration(
     [userId, email]
   );
 }
+
+/**
+ * 获取用户所有可访问的项目所有者ID列表
+ * @param userId 当前用户ID
+ * @param userEmail 当前用户邮箱
+ * @returns 包含权限信息的项目所有者列表
+ */
+export async function getAccessibleProjects(
+  userId: string,
+  userEmail: string
+): Promise<Array<{
+  ownerId: string;
+  isOwner: boolean;
+  role: CollaboratorRole | null;
+  accessibleGroupIds: string[] | null;
+}>> {
+  const projects: Array<{
+    ownerId: string;
+    isOwner: boolean;
+    role: CollaboratorRole | null;
+    accessibleGroupIds: string[] | null;
+  }> = [];
+
+  // 1. 添加自己作为所有者
+  projects.push({
+    ownerId: userId,
+    isOwner: true,
+    role: null,
+    accessibleGroupIds: null,
+  });
+
+  // 2. 获取所有共享项目
+  const sharedProjects = await getSharedProjects(userId, userEmail);
+
+  for (const project of sharedProjects) {
+    const permission = await checkProjectPermission(userId, userEmail, project.owner_id);
+    if (permission.isCollaborator) {
+      projects.push({
+        ownerId: project.owner_id,
+        isOwner: false,
+        role: permission.role,
+        accessibleGroupIds: permission.accessibleGroupIds,
+      });
+    }
+  }
+
+  return projects;
+}

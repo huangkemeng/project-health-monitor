@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Activity, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Activity, Eye, EyeOff, Loader2, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -162,17 +162,16 @@ export default function LoginPage() {
           </CardFooter>
         </Card>
 
-        <p className="mt-8 text-center text-sm text-muted-foreground">
-          © 2026 Health Monitor. All rights reserved.
-        </p>
-        <p className="mt-2 text-center text-xs text-muted-foreground">
+        <p className="mt-8 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
+          © 2026 Health Monitor
           <a
             href="https://github.com/huangkemeng/project-health-monitor"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-primary transition-colors"
+            title="开源项目地址"
           >
-            开源项目地址
+            <Github className="h-4 w-4" />
           </a>
         </p>
       </div>

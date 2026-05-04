@@ -11,12 +11,10 @@ import type { Monitor, MonitorResponse, Webhook, CheckLog, MonitorStats, HttpMet
 
 const router = Router();
 
-// Get all monitors for current user (or project context)
+// Get all monitors for current user (all accessible projects)
 router.get(
   '/',
   authenticate,
-  projectContext(),
-  checkProjectPermission,
   [
     queryValidator('page').optional().isInt({ min: 1 }),
     queryValidator('page_size').optional().isInt({ min: 1, max: 100 }),
@@ -52,78 +50,88 @@ router.get(
 
       const offset = (page - 1) * pageSize;
 
-      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+      const userId = req.user!.userId;
+      const userEmail = req.user!.email;
 
-      // Build query conditions
-      const conditions: string[] = ['m.owner_id = ?'];
-      const values: (string | number)[] = [ownerId];
+      // Get all accessible projects
+      const { getAccessibleProjects } = await import('../services/collaboration');
+      const accessibleProjects = await getAccessibleProjects(userId, userEmail);
 
-      // Apply group filter for collaborators
-      if (!isOwner && accessibleGroupIds !== null) {
-        if (accessibleGroupIds.length === 0) {
-          conditions.push('m.group_id IS NULL');
-        } else {
-          const placeholders = accessibleGroupIds.map(() => '?').join(',');
-          conditions.push(`(m.group_id IS NULL OR m.group_id IN (${placeholders}))`);
-          values.push(...accessibleGroupIds);
-        }
-      }
+      // Collect monitors from all accessible projects
+      const allMonitors: any[] = [];
 
-      if (status) {
-        conditions.push('m.status = ?');
-        values.push(status);
-      }
+      for (const project of accessibleProjects) {
+        // Build query conditions for this project
+        const conditions: string[] = ['m.owner_id = ?'];
+        const values: (string | number)[] = [project.ownerId];
 
-      if (healthStatus) {
-        conditions.push('m.health_status = ?');
-        values.push(healthStatus);
-      }
-
-      if (groupId) {
-        // Check if collaborator has access to this group
-        if (!isOwner && accessibleGroupIds !== null) {
-          if (!accessibleGroupIds.includes(groupId)) {
-            return success(res, {
-              items: [],
-              pagination: { page, page_size: pageSize, total: 0, total_pages: 0 }
-            });
+        // Apply group filter for collaborators
+        if (!project.isOwner && project.accessibleGroupIds !== null) {
+          if (project.accessibleGroupIds.length === 0) {
+            conditions.push('m.group_id IS NULL');
+          } else {
+            const placeholders = project.accessibleGroupIds.map(() => '?').join(',');
+            conditions.push(`(m.group_id IS NULL OR m.group_id IN (${placeholders}))`);
+            values.push(...project.accessibleGroupIds);
           }
         }
-        conditions.push('m.group_id = ?');
-        values.push(groupId);
-      }
 
-      if (keyword) {
-        const sanitizedKeyword = sanitizeSearchKeyword(keyword);
-        if (sanitizedKeyword) {
-          conditions.push('(m.name LIKE ? OR m.url LIKE ?)');
-          values.push(`%${sanitizedKeyword}%`, `%${sanitizedKeyword}%`);
+        if (status) {
+          conditions.push('m.status = ?');
+          values.push(status);
         }
+
+        if (healthStatus) {
+          conditions.push('m.health_status = ?');
+          values.push(healthStatus);
+        }
+
+        if (groupId) {
+          // Check if collaborator has access to this group
+          if (!project.isOwner && project.accessibleGroupIds !== null) {
+            if (!project.accessibleGroupIds.includes(groupId)) {
+              continue; // Skip this project
+            }
+          }
+          conditions.push('m.group_id = ?');
+          values.push(groupId);
+        }
+
+        if (keyword) {
+          const sanitizedKeyword = sanitizeSearchKeyword(keyword);
+          if (sanitizedKeyword) {
+            conditions.push('(m.name LIKE ? OR m.url LIKE ?)');
+            values.push(`%${sanitizedKeyword}%`, `%${sanitizedKeyword}%`);
+          }
+        }
+
+        const whereClause = conditions.join(' AND ');
+
+        // Get monitors for this project
+        const monitors = await query<Monitor>(
+          `SELECT m.*, w.name as webhook_name, g.name as group_name, g.color as group_color
+           FROM monitors m
+           LEFT JOIN webhooks w ON m.webhook_id = w.id
+           LEFT JOIN monitor_groups g ON m.group_id = g.id
+           WHERE ${whereClause}
+           ORDER BY m.created_at DESC`,
+          values
+        );
+
+        // Add permission info to each monitor
+        allMonitors.push(...monitors.map(m => ({
+          ...m,
+          is_own_project: project.isOwner,
+          role: project.role
+        })));
       }
 
-      const whereClause = conditions.join(' AND ');
-
-      // Get total count
-      const countResult = await queryOne<{ total: number }>(
-        `SELECT COUNT(*) as total FROM monitors m WHERE ${whereClause}`,
-        values
-      );
-      const total = countResult?.total || 0;
-
-      // Get monitors
-      const monitors = await query<Monitor>(
-        `SELECT m.*, w.name as webhook_name, g.name as group_name, g.color as group_color
-         FROM monitors m
-         LEFT JOIN webhooks w ON m.webhook_id = w.id
-         LEFT JOIN monitor_groups g ON m.group_id = g.id
-         WHERE ${whereClause}
-         ORDER BY m.created_at DESC
-         LIMIT ? OFFSET ?`,
-        [...values, pageSize, offset]
-      );
+      // Apply pagination
+      const total = allMonitors.length;
+      const paginatedMonitors = allMonitors.slice(offset, offset + pageSize);
 
       success(res, {
-        items: monitors,
+        items: paginatedMonitors,
         pagination: {
           page,
           page_size: pageSize,

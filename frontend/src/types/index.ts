@@ -59,6 +59,10 @@ export interface Monitor {
   failed_checks?: number;
   created_at: string;
   updated_at: string;
+  // 权限相关字段
+  owner_id?: string;
+  is_own_project?: boolean;
+  role?: 'owner' | 'editor' | 'viewer' | null;
 }
 
 export interface MonitorStats {

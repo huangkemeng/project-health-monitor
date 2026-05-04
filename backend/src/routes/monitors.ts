@@ -5,7 +5,7 @@ import { query, queryOne, execute } from '../lib/db';
 import { authenticate } from '../middleware/auth';
 import { success, error, created, validationError, notFound } from '../utils/api-response';
 import { isValidUrl, isValidHttpMethod, safeJsonParse, sanitizeString, sanitizeSearchKeyword } from '../utils/validators';
-import type { Monitor, MonitorResponse, Webhook, CheckLog, MonitorStats, HttpMethod } from '../types';
+import type { Monitor, MonitorResponse, Webhook, CheckLog, MonitorStats, HttpMethod, Alert } from '../types';
 
 const router = Router();
 
@@ -610,6 +610,137 @@ router.post(
     } catch (err) {
       console.error('Resume monitor error:', err);
       error(res, '恢复监控失败', 500);
+    }
+  }
+);
+
+// Manual check monitor
+router.post(
+  '/:id/check',
+  authenticate,
+  [
+    param('id').isUUID()
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        validationError(res, errors.array().map(e => ({ field: e.type === 'field' ? e.path : 'unknown', message: e.msg })));
+        return;
+      }
+
+      const { id } = req.params;
+      const userId = req.user!.userId;
+
+      // Check if monitor exists and belongs to user
+      const monitor = await queryOne<Monitor>(
+        'SELECT * FROM monitors WHERE id = ? AND owner_id = ?',
+        [id, userId]
+      );
+
+      if (!monitor) {
+        notFound(res, '监控项不存在');
+        return;
+      }
+
+      // Perform manual check
+      const startTime = Date.now();
+      let status: 'success' | 'failure' = 'failure';
+      let httpCode: number | null = null;
+      let responseTime: number | null = null;
+      let errorMsg: string | null = null;
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), monitor.timeout * 1000);
+
+        const fetchOptions: RequestInit = {
+          method: monitor.method,
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'ProjectHealthMonitor/1.0 (Manual Check)',
+            ...safeJsonParse(monitor.headers as unknown as string, {})
+          }
+        };
+
+        if (monitor.body && ['POST', 'PUT'].includes(monitor.method)) {
+          fetchOptions.body = monitor.body;
+        }
+
+        const response = await fetch(monitor.url, fetchOptions);
+        clearTimeout(timeoutId);
+
+        httpCode = response.status;
+        responseTime = Date.now() - startTime;
+
+        if (response.status === monitor.expected_status) {
+          status = 'success';
+        } else {
+          status = 'failure';
+          errorMsg = `Expected status ${monitor.expected_status}, got ${response.status}`;
+        }
+      } catch (err) {
+        status = 'failure';
+        responseTime = Date.now() - startTime;
+
+        if (err instanceof Error) {
+          if (err.name === 'AbortError') {
+            errorMsg = `Request timeout after ${monitor.timeout}s`;
+          } else {
+            errorMsg = err.message;
+          }
+        } else {
+          errorMsg = 'Unknown error';
+        }
+      }
+
+      // Record check log
+      await execute(
+        `INSERT INTO check_logs (id, monitor_id, status, http_code, response_time, error_msg, checked_at)
+         VALUES (UUID(), ?, ?, ?, ?, ?, NOW())`,
+        [monitor.id, status, httpCode, responseTime, errorMsg]
+      );
+
+      // Update monitor status
+      const newConsecutiveFailures = status === 'success' ? 0 : monitor.consecutive_failures + 1;
+      let healthStatus: 'normal' | 'warning' | 'critical' = monitor.health_status;
+
+      if (status === 'success') {
+        if (responseTime && responseTime >= monitor.warning_threshold) {
+          healthStatus = 'warning';
+        } else {
+          healthStatus = 'normal';
+        }
+      } else if (newConsecutiveFailures >= monitor.retry_times) {
+        healthStatus = 'critical';
+      } else if (newConsecutiveFailures > 0) {
+        healthStatus = 'warning';
+      }
+
+      await execute(
+        `UPDATE monitors
+         SET consecutive_failures = ?,
+             health_status = ?,
+             last_check_at = NOW(),
+             last_response_time = ?,
+             updated_at = NOW()
+         WHERE id = ?`,
+        [newConsecutiveFailures, healthStatus, responseTime, monitor.id]
+      );
+
+      success(res, {
+        message: '手动检查完成',
+        result: {
+          status,
+          http_code: httpCode,
+          response_time: responseTime,
+          error_msg: errorMsg,
+          health_status: healthStatus
+        }
+      });
+    } catch (err) {
+      console.error('Manual check error:', err);
+      error(res, '手动检查失败', 500);
     }
   }
 );

@@ -26,6 +26,12 @@ const pool = mysql.createPool({
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
   timezone: '+00:00', // Store all times in UTC
+  // Enable SSL for cloud MySQL services
+  ssl: process.env.DB_SSL === 'true' ? {
+    rejectUnauthorized: false
+  } : undefined,
+  // Connection timeout settings
+  connectTimeout: 30000, // 30 seconds
 });
 
 // Track connection health

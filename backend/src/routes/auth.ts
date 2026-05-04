@@ -108,12 +108,16 @@ router.post(
         return;
       }
 
+      console.log('New user created:', { id: newUser.id, username: newUser.username, email: newUser.email });
+
       // Generate token
       const token = await generateToken({
         userId: newUser.id,
         username: newUser.username,
         email: newUser.email
       });
+      
+      console.log('Token generated successfully');
 
       // Return user without password
       const userResponse: UserResponse = {
@@ -126,6 +130,8 @@ router.post(
       created(res, { user: userResponse, token });
     } catch (err) {
       console.error('Registration error:', err);
+      console.error('Error details:', err instanceof Error ? err.message : String(err));
+      console.error('Error stack:', err instanceof Error ? err.stack : 'No stack');
       error(res, '注册失败，请稍后重试', 500);
     }
   }

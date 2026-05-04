@@ -205,7 +205,8 @@ export async function getCollaborators(
       END as group_name,
       pc.role,
       pc.status,
-      pc.created_at
+      pc.created_at,
+      pc.updated_at
      FROM project_collaborators pc
      LEFT JOIN users u ON pc.collaborator_user_id = u.id
      LEFT JOIN monitor_groups mg ON pc.group_id = mg.id
@@ -284,7 +285,7 @@ export async function updateCollaborator(
 }
 
 /**
- * 移除协作者
+ * 移除协作者（软删除，将状态设置为 removed）
  * @param collaboratorId 协作者记录ID
  * @param ownerId 项目所有者ID（用于权限校验）
  */
@@ -293,7 +294,10 @@ export async function removeCollaborator(
   ownerId: string
 ): Promise<void> {
   const [result] = await pool.execute(
-    'DELETE FROM project_collaborators WHERE id = ? AND project_owner_id = ?',
+    `UPDATE project_collaborators 
+     SET status = 'removed', 
+         updated_at = NOW() 
+     WHERE id = ? AND project_owner_id = ?`,
     [collaboratorId, ownerId]
   );
 

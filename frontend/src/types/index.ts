@@ -322,7 +322,7 @@ export interface UptimeData {
 
 // Collaboration Types
 export type CollaboratorRole = 'viewer' | 'editor';
-export type CollaboratorStatus = 'active' | 'rejected';
+export type CollaboratorStatus = 'active' | 'rejected' | 'removed';
 
 export interface Collaborator {
   id: string;
@@ -333,6 +333,7 @@ export interface Collaborator {
   role: CollaboratorRole;
   status: CollaboratorStatus;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface SharedProject {

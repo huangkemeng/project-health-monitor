@@ -39,7 +39,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, Plus, Trash2, UserCog, Mail } from 'lucide-react';
 import { collaborationApi, groupsApi } from '@/lib/api';
-import { Collaborator, CollaboratorRole, MonitorGroup } from '@/types';
+import { Collaborator, CollaboratorRole, CollaboratorStatus, MonitorGroup } from '@/types';
 
 export function CollaborationManager() {
   const { toast } = useToast();
@@ -69,8 +69,10 @@ export function CollaborationManager() {
         collaborationApi.listCollaborators(),
         groupsApi.list(),
       ]);
-      setCollaborators(collaboratorsData.items || []);
-      setGroups(groupsData.items || []);
+      // 协作者API直接返回数组
+      setCollaborators(collaboratorsData || []);
+      // 分组API返回 { items: [], total: number }
+      setGroups(groupsData?.items || []);
     } catch (error) {
       toast({
         title: '加载失败',
@@ -155,21 +157,46 @@ export function CollaborationManager() {
   };
 
   const handleRemove = async (collaborator: Collaborator) => {
-    if (!confirm(`确定要移除协作者 ${collaborator.collaborator_email} 吗？`)) {
+    if (!confirm(`确定要撤销对 ${collaborator.collaborator_email} 的邀请吗？`)) {
       return;
     }
 
     try {
       await collaborationApi.removeCollaborator(collaborator.id);
       toast({
-        title: '移除成功',
-        description: '协作者已被移除',
+        title: '撤销成功',
+        description: '邀请已被撤销',
       });
       loadData();
     } catch (error: any) {
       toast({
-        title: '移除失败',
-        description: error.message || '无法移除协作者',
+        title: '撤销失败',
+        description: error.message || '无法撤销邀请',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleReinvite = async (collaborator: Collaborator) => {
+    if (!confirm(`确定要重新邀请 ${collaborator.collaborator_email} 吗？`)) {
+      return;
+    }
+
+    try {
+      await collaborationApi.inviteCollaborator({
+        email: collaborator.collaborator_email,
+        role: collaborator.role,
+        group_id: collaborator.group_id,
+      });
+      toast({
+        title: '重新邀请成功',
+        description: `已向 ${collaborator.collaborator_email} 发送邀请`,
+      });
+      loadData();
+    } catch (error: any) {
+      toast({
+        title: '邀请失败',
+        description: error.message || '无法发送邀请',
         variant: 'destructive',
       });
     }
@@ -190,6 +217,19 @@ export function CollaborationManager() {
         return <Badge variant="secondary">查看者</Badge>;
       default:
         return <Badge variant="outline">{role}</Badge>;
+    }
+  };
+
+  const getStatusBadge = (status: CollaboratorStatus) => {
+    switch (status) {
+      case 'active':
+        return <Badge variant="default" className="bg-green-500">活跃</Badge>;
+      case 'rejected':
+        return <Badge variant="destructive">已拒绝</Badge>;
+      case 'removed':
+        return <Badge variant="secondary">已移除</Badge>;
+      default:
+        return <Badge variant="outline">待接受</Badge>;
     }
   };
 
@@ -319,37 +359,44 @@ export function CollaborationManager() {
                   </TableCell>
                   <TableCell>{getRoleBadge(collaborator.role)}</TableCell>
                   <TableCell>{getGroupName(collaborator.group_id)}</TableCell>
+                  <TableCell>{getStatusBadge(collaborator.status)}</TableCell>
+                  <TableCell>
+                    {collaborator.status === 'removed' && collaborator.updated_at
+                      ? new Date(collaborator.updated_at).toLocaleDateString('zh-CN')
+                      : new Date(collaborator.created_at).toLocaleDateString('zh-CN')}
+                  </TableCell>
                   <TableCell>
                     {collaborator.status === 'active' ? (
-                      <Badge variant="default" className="bg-green-500">活跃</Badge>
-                    ) : (
-                      <Badge variant="secondary">待接受</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(collaborator.created_at).toLocaleDateString('zh-CN')}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEditDialog(collaborator)}>
-                          <UserCog className="mr-2 h-4 w-4" />
-                          修改权限
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleRemove(collaborator)}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          移除
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditDialog(collaborator)}>
+                            <UserCog className="mr-2 h-4 w-4" />
+                            修改权限
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleRemove(collaborator)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            撤销邀请
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : collaborator.status === 'rejected' || collaborator.status === 'removed' ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleReinvite(collaborator)}
+                      >
+                        <Mail className="mr-2 h-4 w-4" />
+                        重新邀请
+                      </Button>
+                    ) : null}
                   </TableCell>
                 </TableRow>
               ))}

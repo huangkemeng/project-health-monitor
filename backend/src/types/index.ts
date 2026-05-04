@@ -317,6 +317,7 @@ export interface ProjectCollaboratorResponse {
   role: CollaboratorRole;
   status: CollaboratorStatus;
   created_at: Date;
+  updated_at?: Date;
 }
 
 export interface ProjectRejection {

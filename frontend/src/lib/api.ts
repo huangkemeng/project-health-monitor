@@ -248,7 +248,7 @@ export const groupsApi = {
 export const collaborationApi = {
   // Collaborators
   listCollaborators: (config?: AxiosRequestConfig) =>
-    apiClient.get<{ items: Collaborator[] }>('/collaborators', config),
+    apiClient.get<Collaborator[]>('/collaborators', config),
 
   inviteCollaborator: (data: CreateCollaboratorData, config?: AxiosRequestConfig) =>
     apiClient.post<Collaborator>('/collaborators', data, config),

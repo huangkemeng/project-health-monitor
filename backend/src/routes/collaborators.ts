@@ -29,19 +29,19 @@ router.get('/', async (req: Request, res: Response) => {
 /**
  * POST /api/collaborators
  * 邀请协作者
- * Body: { email: string, role: 'viewer' | 'editor', groupId?: string | null }
+ * Body: { email: string, role: 'viewer' | 'editor', groupIds?: string[] | null }
  */
 router.post(
   '/',
   [
     body('email').isEmail().normalizeEmail().withMessage('请输入有效的邮箱地址'),
     body('role').isIn(['viewer', 'editor']).withMessage('权限级别必须是 viewer 或 editor'),
-    body('groupId').optional({ nullable: true }).isString().withMessage('分组ID必须是字符串'),
+    body('groupIds').optional({ nullable: true }).isArray().withMessage('分组ID必须是数组'),
     validate,
   ],
   async (req: Request, res: Response) => {
     try {
-      const { email, role, groupId } = req.body;
+      const { email, role, groupIds } = req.body;
       const ownerId = req.user!.userId;
 
       // 检查是否邀请自己
@@ -55,12 +55,12 @@ router.post(
         ownerId,
         email,
         role,
-        groupId || null
+        groupIds || null
       );
 
       created(res, collaborator, '邀请成功');
     } catch (err: any) {
-      if (err.message === '该用户已被邀请到此分组') {
+      if (err.message === '该用户已被邀请') {
         return error(res, err.message, 409);
       }
       if (err.message === '不能邀请自己') {
@@ -74,23 +74,23 @@ router.post(
 /**
  * PUT /api/collaborators/:id
  * 修改协作者权限
- * Body: { role?: 'viewer' | 'editor', groupId?: string | null }
+ * Body: { role?: 'viewer' | 'editor', groupIds?: string[] | null }
  */
 router.put(
   '/:id',
   [
     param('id').isUUID().withMessage('无效的协作者ID'),
     body('role').optional().isIn(['viewer', 'editor']).withMessage('权限级别必须是 viewer 或 editor'),
-    body('groupId').optional({ nullable: true }).isString().withMessage('分组ID必须是字符串'),
+    body('groupIds').optional({ nullable: true }).isArray().withMessage('分组ID必须是数组'),
     validate,
   ],
   async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { role, groupId } = req.body;
+      const { role, groupIds } = req.body;
       const ownerId = req.user!.userId;
 
-      await collaborationService.updateCollaborator(id, ownerId, { role, groupId });
+      await collaborationService.updateCollaborator(id, ownerId, { role, groupIds });
       success(res, null, '修改成功');
     } catch (err: any) {
       if (err.message === '协作者不存在') {

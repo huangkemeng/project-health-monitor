@@ -306,19 +306,22 @@ export interface ProjectCollaborator {
   project_owner_id: string;
   collaborator_email: string;
   collaborator_user_id: string | null;
-  group_id: string | null;
   role: CollaboratorRole;
   status: CollaboratorStatus;
   created_at: Date;
   updated_at: Date;
 }
 
+export interface CollaboratorGroup {
+  group_id: string;
+  group_name: string;
+}
+
 export interface ProjectCollaboratorResponse {
   id: string;
   collaborator_email: string;
   collaborator_username?: string;
-  group_id: string | null;
-  group_name?: string | null;
+  groups: CollaboratorGroup[];
   role: CollaboratorRole;
   status: CollaboratorStatus;
   created_at: Date;
@@ -337,8 +340,7 @@ export interface SharedProject {
   owner_username: string;
   owner_email: string;
   role: CollaboratorRole | 'owner';
-  group_id: string | null;
-  group_name: string | null;
+  groups: CollaboratorGroup[];
   joined_at: Date;
 }
 

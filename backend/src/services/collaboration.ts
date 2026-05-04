@@ -2,6 +2,7 @@ import pool from '../lib/db';
 import type {
   ProjectCollaborator,
   ProjectCollaboratorResponse,
+  CollaboratorGroup,
   ProjectRejection,
   SharedProject,
   PermissionCheckResult,
@@ -40,35 +41,33 @@ export function clearPermissionCache(userId: string, ownerId: string): void {
  * @param ownerId 项目所有者ID
  * @param email 被邀请者邮箱
  * @param role 权限级别
- * @param groupId 可访问分组ID (null=全部分组, 'ungrouped'=仅未分组)
+ * @param groupIds 可访问分组ID数组 (null=全部分组, ['ungrouped']=仅未分组)
  * @returns 创建的协作者记录
  */
 export async function inviteCollaborator(
   ownerId: string,
   email: string,
   role: CollaboratorRole,
-  groupId: string | null
+  groupIds: string[] | null
 ): Promise<ProjectCollaboratorResponse> {
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
 
-    // 转换 'ungrouped' 为特殊标识
-    const dbGroupId = groupId === 'ungrouped' ? '__UNGROUPED__' : groupId;
-
-    // 检查是否已存在相同记录（同一邮箱+同一分组）
+    // 检查是否已存在活跃的协作者记录（同一邮箱）
     const [existing] = await connection.execute(
       `SELECT id, status FROM project_collaborators
-       WHERE project_owner_id = ? AND collaborator_email = ? AND group_id <=> ?`,
-      [ownerId, email, dbGroupId]
+       WHERE project_owner_id = ? AND collaborator_email = ?`,
+      [ownerId, email]
     );
 
     const existingRecord = (existing as any[])[0];
+    let collaboratorId: string = '';
 
     if (existingRecord) {
       if (existingRecord.status === 'active') {
-        throw new Error('该用户已被邀请到此分组');
+        throw new Error('该用户已被邀请');
       }
 
       // 如果是 rejected 或 removed 状态，重新激活
@@ -92,94 +91,133 @@ export async function inviteCollaborator(
           [role, collaboratorUserId, existingRecord.id]
         );
 
-        // 获取更新后的记录
-        const [rows] = await connection.execute(
-          `SELECT
-            pc.id,
-            pc.collaborator_email,
-            u.username as collaborator_username,
-            CASE
-              WHEN pc.group_id = '__UNGROUPED__' THEN 'ungrouped'
-              ELSE pc.group_id
-            END as group_id,
-            CASE
-              WHEN pc.group_id = '__UNGROUPED__' THEN '未分组'
-              ELSE mg.name
-            END as group_name,
-            pc.role,
-            pc.status,
-            pc.created_at
-           FROM project_collaborators pc
-           LEFT JOIN users u ON pc.collaborator_user_id = u.id
-           LEFT JOIN monitor_groups mg ON pc.group_id = mg.id
-           WHERE pc.id = ?`,
-          [existingRecord.id]
-        );
+        collaboratorId = existingRecord.id;
+      }
+    } else {
+      // 检查被邀请者是否为自己
+      const [ownerUser] = await connection.execute(
+        'SELECT email FROM users WHERE id = ?',
+        [ownerId]
+      );
 
-        await connection.commit();
-        return (rows as ProjectCollaboratorResponse[])[0];
+      if ((ownerUser as any[]).length > 0 && (ownerUser as any[])[0].email === email) {
+        throw new Error('不能邀请自己');
+      }
+
+      // 如果邮箱已注册，自动关联user_id
+      const [existingUser] = await connection.execute(
+        'SELECT id FROM users WHERE email = ?',
+        [email]
+      );
+
+      const collaboratorUserId = (existingUser as any[]).length > 0 ? (existingUser as any[])[0].id : null;
+
+      // 创建协作记录
+      const [result] = await connection.execute(
+        `INSERT INTO project_collaborators
+         (id, project_owner_id, collaborator_email, collaborator_user_id, role, status)
+         VALUES (UUID(), ?, ?, ?, ?, 'active')`,
+        [ownerId, email, collaboratorUserId, role]
+      );
+
+      // 获取新创建的协作者ID
+      const [newRecord] = await connection.execute(
+        `SELECT id FROM project_collaborators
+         WHERE project_owner_id = ? AND collaborator_email = ? AND status = 'active'`,
+        [ownerId, email]
+      );
+
+      collaboratorId = (newRecord as any[])[0].id;
+    }
+
+    // 确保 collaboratorId 已设置
+    if (!collaboratorId) {
+      throw new Error('创建协作者记录失败');
+    }
+
+    // 清除旧的分组关联
+    await connection.execute(
+      'DELETE FROM project_collaborator_groups WHERE collaborator_id = ?',
+      [collaboratorId]
+    );
+
+    // 添加新的分组关联
+    if (groupIds && groupIds.length > 0) {
+      for (const groupId of groupIds) {
+        const dbGroupId = groupId === 'ungrouped' ? '__UNGROUPED__' : groupId;
+        await connection.execute(
+          `INSERT INTO project_collaborator_groups (collaborator_id, group_id)
+           VALUES (?, ?)`,
+          [collaboratorId, dbGroupId]
+        );
       }
     }
 
-    // 检查被邀请者是否为自己
-    const [ownerUser] = await connection.execute(
-      'SELECT email FROM users WHERE id = ?',
-      [ownerId]
-    );
-
-    if ((ownerUser as any[]).length > 0 && (ownerUser as any[])[0].email === email) {
-      throw new Error('不能邀请自己');
-    }
-
-    // 如果邮箱已注册，自动关联user_id
-    const [existingUser] = await connection.execute(
-      'SELECT id FROM users WHERE email = ?',
-      [email]
-    );
-
-    const collaboratorUserId = (existingUser as any[]).length > 0 ? (existingUser as any[])[0].id : null;
-
-    // 创建协作记录
-    const [result] = await connection.execute(
-      `INSERT INTO project_collaborators
-       (id, project_owner_id, collaborator_email, collaborator_user_id, group_id, role, status)
-       VALUES (UUID(), ?, ?, ?, ?, ?, 'active')`,
-      [ownerId, email, collaboratorUserId, dbGroupId, role]
-    );
-
-    // 获取创建的记录
-    const [rows] = await connection.execute(
-      `SELECT
-        pc.id,
-        pc.collaborator_email,
-        u.username as collaborator_username,
-        CASE
-          WHEN pc.group_id = '__UNGROUPED__' THEN 'ungrouped'
-          ELSE pc.group_id
-        END as group_id,
-        CASE
-          WHEN pc.group_id = '__UNGROUPED__' THEN '未分组'
-          ELSE mg.name
-        END as group_name,
-        pc.role,
-        pc.status,
-        pc.created_at
-       FROM project_collaborators pc
-       LEFT JOIN users u ON pc.collaborator_user_id = u.id
-       LEFT JOIN monitor_groups mg ON pc.group_id = mg.id
-       WHERE pc.project_owner_id = ? AND pc.collaborator_email = ? AND pc.group_id <=> ?`,
-      [ownerId, email, dbGroupId]
-    );
-
     await connection.commit();
 
-    return (rows as ProjectCollaboratorResponse[])[0];
+    // 返回完整的协作者信息
+    return await getCollaboratorById(collaboratorId);
   } catch (error) {
     await connection.rollback();
     throw error;
   } finally {
     connection.release();
   }
+}
+
+/**
+ * 获取单个协作者信息
+ * @param collaboratorId 协作者ID
+ * @returns 协作者信息
+ */
+async function getCollaboratorById(collaboratorId: string): Promise<ProjectCollaboratorResponse> {
+  const [collabRows] = await pool.execute(
+    `SELECT
+      pc.id,
+      pc.collaborator_email,
+      u.username as collaborator_username,
+      pc.role,
+      pc.status,
+      pc.created_at,
+      pc.updated_at
+     FROM project_collaborators pc
+     LEFT JOIN users u ON pc.collaborator_user_id = u.id
+     WHERE pc.id = ?`,
+    [collaboratorId]
+  );
+
+  const collaborator = (collabRows as any[])[0];
+  if (!collaborator) {
+    throw new Error('协作者不存在');
+  }
+
+  // 获取分组信息
+  const [groupRows] = await pool.execute(
+    `SELECT
+      CASE
+        WHEN pcg.group_id = '__UNGROUPED__' THEN 'ungrouped'
+        ELSE pcg.group_id
+      END as group_id,
+      CASE
+        WHEN pcg.group_id = '__UNGROUPED__' THEN '未分组'
+        ELSE mg.name
+      END as group_name
+     FROM project_collaborator_groups pcg
+     LEFT JOIN monitor_groups mg ON pcg.group_id = mg.id
+     WHERE pcg.collaborator_id = ?`,
+    [collaboratorId]
+  );
+
+  return {
+    id: collaborator.id,
+    collaborator_email: collaborator.collaborator_email,
+    collaborator_username: collaborator.collaborator_username,
+    groups: (groupRows as CollaboratorGroup[]) || [],
+    role: collaborator.role,
+    status: collaborator.status,
+    created_at: collaborator.created_at,
+    updated_at: collaborator.updated_at,
+  };
 }
 
 /**
@@ -190,32 +228,57 @@ export async function inviteCollaborator(
 export async function getCollaborators(
   ownerId: string
 ): Promise<ProjectCollaboratorResponse[]> {
-  const [rows] = await pool.execute(
+  // 获取所有协作者
+  const [collabRows] = await pool.execute(
     `SELECT
       pc.id,
       pc.collaborator_email,
       u.username as collaborator_username,
-      CASE
-        WHEN pc.group_id = '__UNGROUPED__' THEN 'ungrouped'
-        ELSE pc.group_id
-      END as group_id,
-      CASE
-        WHEN pc.group_id = '__UNGROUPED__' THEN '未分组'
-        ELSE mg.name
-      END as group_name,
       pc.role,
       pc.status,
       pc.created_at,
       pc.updated_at
      FROM project_collaborators pc
      LEFT JOIN users u ON pc.collaborator_user_id = u.id
-     LEFT JOIN monitor_groups mg ON pc.group_id = mg.id
      WHERE pc.project_owner_id = ?
      ORDER BY pc.created_at DESC`,
     [ownerId]
   );
 
-  return rows as ProjectCollaboratorResponse[];
+  const collaborators = collabRows as any[];
+
+  // 为每个协作者获取分组信息
+  const result: ProjectCollaboratorResponse[] = [];
+  for (const collab of collaborators) {
+    const [groupRows] = await pool.execute(
+      `SELECT
+        CASE
+          WHEN pcg.group_id = '__UNGROUPED__' THEN 'ungrouped'
+          ELSE pcg.group_id
+        END as group_id,
+        CASE
+          WHEN pcg.group_id = '__UNGROUPED__' THEN '未分组'
+          ELSE mg.name
+        END as group_name
+       FROM project_collaborator_groups pcg
+       LEFT JOIN monitor_groups mg ON pcg.group_id = mg.id
+       WHERE pcg.collaborator_id = ?`,
+      [collab.id]
+    );
+
+    result.push({
+      id: collab.id,
+      collaborator_email: collab.collaborator_email,
+      collaborator_username: collab.collaborator_username,
+      groups: (groupRows as CollaboratorGroup[]) || [],
+      role: collab.role,
+      status: collab.status,
+      created_at: collab.created_at,
+      updated_at: collab.updated_at,
+    });
+  }
+
+  return result;
 }
 
 /**
@@ -229,7 +292,7 @@ export async function updateCollaborator(
   ownerId: string,
   updates: {
     role?: CollaboratorRole;
-    groupId?: string | null;
+    groupIds?: string[] | null;
   }
 ): Promise<void> {
   const connection = await pool.getConnection();
@@ -247,33 +310,34 @@ export async function updateCollaborator(
       throw new Error('协作者不存在');
     }
 
-    // 构建更新语句
-    const setClauses: string[] = [];
-    const values: any[] = [];
-
+    // 更新角色
     if (updates.role !== undefined) {
-      setClauses.push('role = ?');
-      values.push(updates.role);
+      await connection.execute(
+        'UPDATE project_collaborators SET role = ? WHERE id = ? AND project_owner_id = ?',
+        [updates.role, collaboratorId, ownerId]
+      );
     }
 
-    if (updates.groupId !== undefined) {
-      setClauses.push('group_id = ?');
-      // 转换 'ungrouped' 为特殊标识
-      const dbGroupId = updates.groupId === 'ungrouped' ? '__UNGROUPED__' : updates.groupId;
-      values.push(dbGroupId);
+    // 更新分组关联
+    if (updates.groupIds !== undefined) {
+      // 清除旧的分组关联
+      await connection.execute(
+        'DELETE FROM project_collaborator_groups WHERE collaborator_id = ?',
+        [collaboratorId]
+      );
+
+      // 添加新的分组关联
+      if (updates.groupIds && updates.groupIds.length > 0) {
+        for (const groupId of updates.groupIds) {
+          const dbGroupId = groupId === 'ungrouped' ? '__UNGROUPED__' : groupId;
+          await connection.execute(
+            `INSERT INTO project_collaborator_groups (collaborator_id, group_id)
+             VALUES (?, ?)`,
+            [collaboratorId, dbGroupId]
+          );
+        }
+      }
     }
-
-    if (setClauses.length === 0) {
-      throw new Error('没有要更新的字段');
-    }
-
-    values.push(collaboratorId);
-    values.push(ownerId);
-
-    await connection.execute(
-      `UPDATE project_collaborators SET ${setClauses.join(', ')} WHERE id = ? AND project_owner_id = ?`,
-      values
-    );
 
     await connection.commit();
   } catch (error) {
@@ -332,29 +396,73 @@ export async function getSharedProjects(
       u.username as owner_username,
       u.email as owner_email,
       pc_agg.role,
-      pc_agg.group_id,
-      mg.name as group_name,
       pc_agg.joined_at
      FROM (
        SELECT
          project_owner_id,
          MAX(CASE WHEN role = 'editor' THEN 'editor' ELSE 'viewer' END) as role,
-         group_id,
          MIN(created_at) as joined_at
        FROM project_collaborators
        WHERE (collaborator_user_id = ? OR collaborator_email = ?)
          AND status = 'active'
-       GROUP BY project_owner_id, group_id
+       GROUP BY project_owner_id
      ) pc_agg
      JOIN users u ON pc_agg.project_owner_id = u.id
-     LEFT JOIN monitor_groups mg ON pc_agg.group_id = mg.id
      LEFT JOIN project_rejections pr ON pr.user_id = ? AND pr.project_owner_id = pc_agg.project_owner_id
      WHERE pr.id IS NULL
      ORDER BY pc_agg.joined_at DESC`,
     [userId, userEmail, userId]
   );
 
-  return rows as SharedProject[];
+  const projects = rows as any[];
+
+  // 为每个项目获取分组信息
+  const result: SharedProject[] = [];
+  for (const project of projects) {
+    // 获取该项目的所有协作者记录ID
+    const [collabRows] = await pool.execute(
+      `SELECT id FROM project_collaborators
+       WHERE project_owner_id = ?
+         AND (collaborator_user_id = ? OR collaborator_email = ?)
+         AND status = 'active'`,
+      [project.owner_id, userId, userEmail]
+    );
+
+    const collabIds = (collabRows as any[]).map(r => r.id);
+
+    let groups: CollaboratorGroup[] = [];
+
+    if (collabIds.length > 0) {
+      const [groupRows] = await pool.execute(
+        `SELECT DISTINCT
+          CASE
+            WHEN pcg.group_id = '__UNGROUPED__' THEN 'ungrouped'
+            ELSE pcg.group_id
+          END as group_id,
+          CASE
+            WHEN pcg.group_id = '__UNGROUPED__' THEN '未分组'
+            ELSE mg.name
+          END as group_name
+         FROM project_collaborator_groups pcg
+         LEFT JOIN monitor_groups mg ON pcg.group_id = mg.id
+         WHERE pcg.collaborator_id IN (${collabIds.map(() => '?').join(',')})`,
+        collabIds
+      );
+
+      groups = (groupRows as CollaboratorGroup[]) || [];
+    }
+
+    result.push({
+      owner_id: project.owner_id,
+      owner_username: project.owner_username,
+      owner_email: project.owner_email,
+      role: project.role,
+      groups: groups,
+      joined_at: project.joined_at,
+    });
+  }
+
+  return result;
 }
 
 /**
@@ -458,13 +566,44 @@ export async function checkProjectPermission(
   const accessibleGroups: (string | null)[] = [];
   let role: CollaboratorRole = 'viewer';
 
+  // 获取所有协作者ID
+  const collaboratorIds = collabRows.map(c => c.id);
+
+  // 查询所有分组关联
+  const [groupRows] = await pool.execute(
+    `SELECT collaborator_id, group_id
+     FROM project_collaborator_groups
+     WHERE collaborator_id IN (${collaboratorIds.map(() => '?').join(',')})`,
+    collaboratorIds
+  );
+
+  // 按协作者ID分组
+  const groupMap = new Map<string, string[]>();
+  for (const gr of groupRows as any[]) {
+    if (!groupMap.has(gr.collaborator_id)) {
+      groupMap.set(gr.collaborator_id, []);
+    }
+    groupMap.get(gr.collaborator_id)!.push(gr.group_id);
+  }
+
   for (const collab of collabRows) {
-    // 转换 '__UNGROUPED__' 为 'ungrouped'
-    const groupId = collab.group_id === '__UNGROUPED__' ? 'ungrouped' : collab.group_id;
-    accessibleGroups.push(groupId);
     // 如果有任何一个协作记录是editor，则赋予editor权限
     if (collab.role === 'editor') {
       role = 'editor';
+    }
+
+    // 获取该协作者的分组
+    const collabGroups = groupMap.get(collab.id) || [];
+
+    if (collabGroups.length === 0) {
+      // 没有分组关联 = 全部分组
+      accessibleGroups.push(null);
+    } else {
+      for (const g of collabGroups) {
+        // 转换 '__UNGROUPED__' 为 'ungrouped'
+        const groupId = g === '__UNGROUPED__' ? 'ungrouped' : g;
+        accessibleGroups.push(groupId);
+      }
     }
   }
 
@@ -474,10 +613,10 @@ export async function checkProjectPermission(
   let accessibleGroupIds: string[] | null;
   if (accessibleGroups.includes(null)) {
     accessibleGroupIds = null; // 全部分组
-  } else if (accessibleGroups.includes('ungrouped')) {
-    accessibleGroupIds = ['ungrouped']; // 仅未分组
   } else {
-    accessibleGroupIds = accessibleGroups.filter((g): g is string => g !== null && g !== 'ungrouped');
+    // 去重并过滤
+    const uniqueGroups = [...new Set(accessibleGroups.filter((g): g is string => g !== null))];
+    accessibleGroupIds = uniqueGroups.length > 0 ? uniqueGroups : [];
   }
 
   const result: PermissionCheckResult = {

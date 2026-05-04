@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { MoreHorizontal, Plus, Trash2, UserCog, Mail } from 'lucide-react';
 import { collaborationApi, groupsApi } from '@/lib/api';
 import { Collaborator, CollaboratorRole, CollaboratorStatus, MonitorGroup } from '@/types';
@@ -53,12 +54,12 @@ export function CollaborationManager() {
   // Invite form state
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<CollaboratorRole>('viewer');
-  const [inviteGroupId, setInviteGroupId] = useState<string>('all');
+  const [inviteGroupIds, setInviteGroupIds] = useState<string[]>([]);
   const [inviting, setInviting] = useState(false);
 
   // Edit form state
   const [editRole, setEditRole] = useState<CollaboratorRole>('viewer');
-  const [editGroupId, setEditGroupId] = useState<string>('all');
+  const [editGroupIds, setEditGroupIds] = useState<string[]>([]);
   const [updating, setUpdating] = useState(false);
 
   // 加载数据的回调函数
@@ -103,7 +104,7 @@ export function CollaborationManager() {
       await collaborationApi.inviteCollaborator({
         email: inviteEmail.trim(),
         role: inviteRole,
-        groupId: inviteGroupId === 'all' ? null : inviteGroupId,
+        groupIds: inviteGroupIds.length > 0 ? inviteGroupIds : null,
       });
 
       toast({
@@ -114,7 +115,7 @@ export function CollaborationManager() {
       setInviteDialogOpen(false);
       setInviteEmail('');
       setInviteRole('viewer');
-      setInviteGroupId('all');
+      setInviteGroupIds([]);
       loadData();
     } catch (error: any) {
       toast({
@@ -134,7 +135,7 @@ export function CollaborationManager() {
       setUpdating(true);
       await collaborationApi.updateCollaborator(selectedCollaborator.id, {
         role: editRole,
-        groupId: editGroupId === 'all' ? null : editGroupId,
+        groupIds: editGroupIds.length > 0 ? editGroupIds : null,
       });
 
       toast({
@@ -186,7 +187,7 @@ export function CollaborationManager() {
       await collaborationApi.inviteCollaborator({
         email: collaborator.collaborator_email,
         role: collaborator.role,
-        groupId: collaborator.group_id,
+        groupIds: collaborator.groups?.map(g => g.group_id) || null,
       });
       toast({
         title: '重新邀请成功',
@@ -205,7 +206,9 @@ export function CollaborationManager() {
   const openEditDialog = (collaborator: Collaborator) => {
     setSelectedCollaborator(collaborator);
     setEditRole(collaborator.role);
-    setEditGroupId(collaborator.group_id || 'all');
+    // 从 groups 数组中提取 group_id
+    const groupIds = collaborator.groups?.map(g => g.group_id) || [];
+    setEditGroupIds(groupIds);
     setEditDialogOpen(true);
   };
 
@@ -233,10 +236,19 @@ export function CollaborationManager() {
     }
   };
 
-  const getGroupName = (groupId: string | null) => {
-    if (!groupId) return <span className="text-muted-foreground">所有分组</span>;
-    const group = groups.find((g) => g.id === groupId);
-    return group ? group.name : <span className="text-muted-foreground">未知分组</span>;
+  const getGroupNames = (collaboratorGroups: { group_id: string; group_name: string }[]) => {
+    if (!collaboratorGroups || collaboratorGroups.length === 0) {
+      return <span className="text-muted-foreground">所有分组</span>;
+    }
+    return (
+      <div className="flex flex-wrap gap-1">
+        {collaboratorGroups.map((g) => (
+          <Badge key={g.group_id} variant="outline" className="text-xs">
+            {g.group_name}
+          </Badge>
+        ))}
+      </div>
+    );
   };
 
   if (loading) {
@@ -300,21 +312,56 @@ export function CollaborationManager() {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="group">可访问分组</Label>
-                <Select value={inviteGroupId} onValueChange={setInviteGroupId}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">所有分组</SelectItem>
-                    <SelectItem value="ungrouped">仅未分组</SelectItem>
-                    {groups.filter(g => !g.is_default).map((group) => (
-                      <SelectItem key={group.id} value={group.id}>
+                <Label>可访问分组</Label>
+                <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="invite-all"
+                      checked={inviteGroupIds.length === 0}
+                      onCheckedChange={() => setInviteGroupIds([])}
+                    />
+                    <Label htmlFor="invite-all" className="text-sm font-normal cursor-pointer">
+                      所有分组
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="invite-ungrouped"
+                      checked={inviteGroupIds.includes('ungrouped')}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setInviteGroupIds(prev => [...prev.filter(id => id !== 'ungrouped'), 'ungrouped']);
+                        } else {
+                          setInviteGroupIds(prev => prev.filter(id => id !== 'ungrouped'));
+                        }
+                      }}
+                    />
+                    <Label htmlFor="invite-ungrouped" className="text-sm font-normal cursor-pointer">
+                      未分组
+                    </Label>
+                  </div>
+                  {groups.filter(g => !g.is_default).map((group) => (
+                    <div key={group.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`invite-${group.id}`}
+                        checked={inviteGroupIds.includes(group.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setInviteGroupIds(prev => [...prev.filter(id => id !== group.id), group.id]);
+                          } else {
+                            setInviteGroupIds(prev => prev.filter(id => id !== group.id));
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`invite-${group.id}`} className="text-sm font-normal cursor-pointer">
                         {group.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  不选择任何分组 = 所有分组，可多选
+                </p>
               </div>
             </div>
             <DialogFooter>
@@ -358,7 +405,7 @@ export function CollaborationManager() {
                     )}
                   </TableCell>
                   <TableCell>{getRoleBadge(collaborator.role)}</TableCell>
-                  <TableCell>{getGroupName(collaborator.group_id)}</TableCell>
+                  <TableCell>{getGroupNames(collaborator.groups)}</TableCell>
                   <TableCell>{getStatusBadge(collaborator.status)}</TableCell>
                   <TableCell>
                     {collaborator.status === 'removed' && collaborator.updated_at
@@ -428,21 +475,56 @@ export function CollaborationManager() {
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-group">可访问分组</Label>
-              <Select value={editGroupId} onValueChange={setEditGroupId}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">所有分组</SelectItem>
-                  <SelectItem value="ungrouped">仅未分组</SelectItem>
-                  {groups.filter(g => !g.is_default).map((group) => (
-                    <SelectItem key={group.id} value={group.id}>
+              <Label>可访问分组</Label>
+              <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit-all"
+                    checked={editGroupIds.length === 0}
+                    onCheckedChange={() => setEditGroupIds([])}
+                  />
+                  <Label htmlFor="edit-all" className="text-sm font-normal cursor-pointer">
+                    所有分组
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit-ungrouped"
+                    checked={editGroupIds.includes('ungrouped')}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setEditGroupIds(prev => [...prev.filter(id => id !== 'ungrouped'), 'ungrouped']);
+                      } else {
+                        setEditGroupIds(prev => prev.filter(id => id !== 'ungrouped'));
+                      }
+                    }}
+                  />
+                  <Label htmlFor="edit-ungrouped" className="text-sm font-normal cursor-pointer">
+                    未分组
+                  </Label>
+                </div>
+                {groups.filter(g => !g.is_default).map((group) => (
+                  <div key={group.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`edit-${group.id}`}
+                      checked={editGroupIds.includes(group.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setEditGroupIds(prev => [...prev.filter(id => id !== group.id), group.id]);
+                        } else {
+                          setEditGroupIds(prev => prev.filter(id => id !== group.id));
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`edit-${group.id}`} className="text-sm font-normal cursor-pointer">
                       {group.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                不选择任何分组 = 所有分组，可多选
+              </p>
             </div>
           </div>
           <DialogFooter>

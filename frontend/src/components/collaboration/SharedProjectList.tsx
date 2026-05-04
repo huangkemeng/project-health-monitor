@@ -97,10 +97,19 @@ export function SharedProjectList() {
     }
   };
 
-  const getGroupName = (groupId: string | null) => {
-    if (!groupId) return '所有分组';
-    if (groupId === 'ungrouped') return '未分组';
-    return '指定分组';
+  const getGroupNames = (groups: { group_id: string; group_name: string }[]) => {
+    if (!groups || groups.length === 0) {
+      return <span className="text-muted-foreground">所有分组</span>;
+    }
+    return (
+      <div className="flex flex-wrap gap-1">
+        {groups.map((g) => (
+          <Badge key={g.group_id} variant="outline" className="text-xs">
+            {g.group_name}
+          </Badge>
+        ))}
+      </div>
+    );
   };
 
   if (loading) {
@@ -156,7 +165,7 @@ export function SharedProjectList() {
                   <TableCell className="font-medium">{project.owner_username}</TableCell>
                   <TableCell>{project.owner_email}</TableCell>
                   <TableCell>{getRoleBadge(project.role)}</TableCell>
-                  <TableCell>{getGroupName(project.group_id)}</TableCell>
+                  <TableCell>{getGroupNames(project.groups)}</TableCell>
                   <TableCell>
                     {new Date(project.joined_at).toLocaleDateString('zh-CN')}
                   </TableCell>

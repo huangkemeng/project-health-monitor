@@ -334,12 +334,16 @@ export interface UptimeData {
 export type CollaboratorRole = 'viewer' | 'editor';
 export type CollaboratorStatus = 'active' | 'rejected' | 'removed';
 
+export interface CollaboratorGroup {
+  group_id: string;
+  group_name: string;
+}
+
 export interface Collaborator {
   id: string;
   collaborator_email: string;
   collaborator_username?: string;
-  group_id: string | null;
-  group_name?: string | null;
+  groups: CollaboratorGroup[];
   role: CollaboratorRole;
   status: CollaboratorStatus;
   created_at: string;
@@ -351,8 +355,7 @@ export interface SharedProject {
   owner_username: string;
   owner_email: string;
   role: CollaboratorRole | 'owner';
-  group_id: string | null;
-  group_name: string | null;
+  groups: CollaboratorGroup[];
   joined_at: string;
   is_own_project?: boolean;
 }
@@ -369,10 +372,10 @@ export interface ProjectContext {
 export interface CreateCollaboratorData {
   email: string;
   role: CollaboratorRole;
-  groupId?: string | null;
+  groupIds?: string[] | null;
 }
 
 export interface UpdateCollaboratorData {
   role?: CollaboratorRole;
-  groupId?: string | null;
+  groupIds?: string[] | null;
 }

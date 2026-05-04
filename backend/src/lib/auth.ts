@@ -1,8 +1,8 @@
 import { SignJWT, jwtVerify } from 'jose';
 import type { JwtPayload } from '../types';
 
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h'; // Default: 24 hours for non-remember me
-const JWT_EXPIRES_IN_REMEMBER = process.env.JWT_EXPIRES_IN_REMEMBER || '30d'; // 30 days for remember me
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24 hours'; // Default: 24 hours for non-remember me
+const JWT_EXPIRES_IN_REMEMBER = process.env.JWT_EXPIRES_IN_REMEMBER || '30 days'; // 30 days for remember me
 
 // Get JWT_SECRET at runtime to handle Vercel environment
 function getJwtSecret(): Uint8Array {

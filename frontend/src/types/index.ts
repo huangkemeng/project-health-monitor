@@ -359,10 +359,10 @@ export interface ProjectContext {
 export interface CreateCollaboratorData {
   email: string;
   role: CollaboratorRole;
-  group_id?: string | null;
+  groupId?: string | null;
 }
 
 export interface UpdateCollaboratorData {
   role?: CollaboratorRole;
-  group_id?: string | null;
+  groupId?: string | null;
 }

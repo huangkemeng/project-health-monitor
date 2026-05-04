@@ -103,7 +103,7 @@ export function CollaborationManager() {
       await collaborationApi.inviteCollaborator({
         email: inviteEmail.trim(),
         role: inviteRole,
-        group_id: inviteGroupId === 'all' ? null : inviteGroupId,
+        groupId: inviteGroupId === 'all' ? null : inviteGroupId,
       });
 
       toast({
@@ -134,7 +134,7 @@ export function CollaborationManager() {
       setUpdating(true);
       await collaborationApi.updateCollaborator(selectedCollaborator.id, {
         role: editRole,
-        group_id: editGroupId === 'all' ? null : editGroupId,
+        groupId: editGroupId === 'all' ? null : editGroupId,
       });
 
       toast({
@@ -186,7 +186,7 @@ export function CollaborationManager() {
       await collaborationApi.inviteCollaborator({
         email: collaborator.collaborator_email,
         role: collaborator.role,
-        group_id: collaborator.group_id,
+        groupId: collaborator.group_id,
       });
       toast({
         title: '重新邀请成功',

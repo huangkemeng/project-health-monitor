@@ -274,13 +274,10 @@ router.get(
   }
 );
 
-// Create monitor
+// Create monitor - only owner can create in their own project
 router.post(
   '/',
   authenticate,
-  projectContext(),
-  checkProjectPermission,
-  requireRole('editor'),
   [
     body('name').trim().isLength({ min: 1, max: 50 }),
     body('url').isURL(),
@@ -300,6 +297,8 @@ router.post(
         return;
       }
 
+      const userId = req.user!.userId;
+
       const {
         name,
         url,
@@ -315,7 +314,8 @@ router.post(
         group_id
       } = req.body;
 
-      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+      // Only owner can create monitor in their own project
+      const ownerId = userId;
 
       // Validate URL format
       if (!isValidUrl(url)) {
@@ -344,10 +344,6 @@ router.post(
       // Validate group_id if provided
       let finalGroupId = group_id;
       if (group_id) {
-        // Check if collaborator has access to this group
-        if (!isOwner && accessibleGroupIds !== null && !accessibleGroupIds.includes(group_id)) {
-          return forbidden(res, '您没有权限在此分组中创建监控项');
-        }
         const group = await queryOne(
           'SELECT * FROM monitor_groups WHERE id = ? AND owner_id = ?',
           [group_id, ownerId]
@@ -401,9 +397,6 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  projectContext(),
-  checkProjectPermission,
-  requireRole('editor'),
   [
     param('id').isUUID(),
     body('name').optional().trim().isLength({ min: 1, max: 50 }),
@@ -425,25 +418,41 @@ router.put(
       }
 
       const { id } = req.params;
-      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+      const userId = req.user!.userId;
+      const userEmail = req.user!.email;
 
-      // Check if collaborator has access to this monitor
-      if (!isOwner) {
-        const hasAccess = await canAccessMonitor(id, ownerId, accessibleGroupIds);
+      // First get monitor to check ownership
+      const monitorBasic = await queryOne<{ owner_id: string }>(
+        'SELECT owner_id FROM monitors WHERE id = ?',
+        [id]
+      );
+
+      if (!monitorBasic) {
+        notFound(res, '监控项不存在');
+        return;
+      }
+
+      const ownerId = monitorBasic.owner_id;
+
+      // Check permission
+      const { checkProjectPermission: checkPermission } = await import('../services/collaboration');
+      const permission = await checkPermission(userId, userEmail, ownerId);
+
+      if (!permission.isOwner && !permission.isCollaborator) {
+        return forbidden(res, '您没有权限更新此监控项');
+      }
+
+      // Only owner or editor can update
+      if (!permission.isOwner && permission.role !== 'editor') {
+        return forbidden(res, '您没有权限更新此监控项');
+      }
+
+      // Check if collaborator has access to this monitor's group
+      if (!permission.isOwner && permission.accessibleGroupIds !== null) {
+        const hasAccess = await canAccessMonitor(id, ownerId, permission.accessibleGroupIds);
         if (!hasAccess) {
           return forbidden(res, '您没有权限更新此监控项');
         }
-      }
-
-      // Check if monitor exists and belongs to user
-      const existingMonitor = await queryOne<Monitor>(
-        'SELECT * FROM monitors WHERE id = ? AND owner_id = ?',
-        [id, ownerId]
-      );
-
-      if (!existingMonitor) {
-        notFound(res, '监控项不存在');
-        return;
       }
 
       const {
@@ -473,8 +482,11 @@ router.put(
         return;
       }
 
-      // Validate webhook_id if provided
+      // Validate webhook_id if provided (only owner can use webhooks)
       if (webhook_id) {
+        if (!permission.isOwner) {
+          return forbidden(res, '协作者不能使用 Webhook');
+        }
         const webhook = await queryOne<Webhook>(
           'SELECT * FROM webhooks WHERE id = ? AND owner_id = ?',
           [webhook_id, ownerId]
@@ -488,7 +500,7 @@ router.put(
       // Validate group_id if provided
       if (group_id) {
         // Check if collaborator has access to target group
-        if (!isOwner && accessibleGroupIds !== null && !accessibleGroupIds.includes(group_id)) {
+        if (!permission.isOwner && permission.accessibleGroupIds !== null && !permission.accessibleGroupIds.includes(group_id)) {
           return forbidden(res, '您没有权限将监控项移动到此分组');
         }
         const group = await queryOne(
@@ -575,9 +587,6 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  projectContext(),
-  checkProjectPermission,
-  requireRole('editor'),
   [
     param('id').isUUID()
   ],
@@ -590,25 +599,41 @@ router.delete(
       }
 
       const { id } = req.params;
-      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+      const userId = req.user!.userId;
+      const userEmail = req.user!.email;
 
-      // Check if collaborator has access to this monitor
-      if (!isOwner) {
-        const hasAccess = await canAccessMonitor(id, ownerId, accessibleGroupIds);
+      // First get monitor to check ownership
+      const monitorBasic = await queryOne<{ owner_id: string }>(
+        'SELECT owner_id FROM monitors WHERE id = ?',
+        [id]
+      );
+
+      if (!monitorBasic) {
+        notFound(res, '监控项不存在');
+        return;
+      }
+
+      const ownerId = monitorBasic.owner_id;
+
+      // Check permission
+      const { checkProjectPermission: checkPermission } = await import('../services/collaboration');
+      const permission = await checkPermission(userId, userEmail, ownerId);
+
+      if (!permission.isOwner && !permission.isCollaborator) {
+        return forbidden(res, '您没有权限删除此监控项');
+      }
+
+      // Only owner or editor can delete
+      if (!permission.isOwner && permission.role !== 'editor') {
+        return forbidden(res, '您没有权限删除此监控项');
+      }
+
+      // Check if collaborator has access to this monitor's group
+      if (!permission.isOwner && permission.accessibleGroupIds !== null) {
+        const hasAccess = await canAccessMonitor(id, ownerId, permission.accessibleGroupIds);
         if (!hasAccess) {
           return forbidden(res, '您没有权限删除此监控项');
         }
-      }
-
-      // Check if monitor exists and belongs to user
-      const existingMonitor = await queryOne<Monitor>(
-        'SELECT * FROM monitors WHERE id = ? AND owner_id = ?',
-        [id, ownerId]
-      );
-
-      if (!existingMonitor) {
-        notFound(res, '监控项不存在');
-        return;
       }
 
       // Delete related records first
@@ -630,9 +655,6 @@ router.delete(
 router.post(
   '/:id/pause',
   authenticate,
-  projectContext(),
-  checkProjectPermission,
-  requireRole('editor'),
   [
     param('id').isUUID()
   ],
@@ -645,24 +667,41 @@ router.post(
       }
 
       const { id } = req.params;
-      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+      const userId = req.user!.userId;
+      const userEmail = req.user!.email;
 
-      // Check if collaborator has access to this monitor
-      if (!isOwner) {
-        const hasAccess = await canAccessMonitor(id, ownerId, accessibleGroupIds);
+      // First get monitor to check ownership
+      const monitorBasic = await queryOne<{ owner_id: string }>(
+        'SELECT owner_id FROM monitors WHERE id = ?',
+        [id]
+      );
+
+      if (!monitorBasic) {
+        notFound(res, '监控项不存在');
+        return;
+      }
+
+      const ownerId = monitorBasic.owner_id;
+
+      // Check permission
+      const { checkProjectPermission: checkPermission } = await import('../services/collaboration');
+      const permission = await checkPermission(userId, userEmail, ownerId);
+
+      if (!permission.isOwner && !permission.isCollaborator) {
+        return forbidden(res, '您没有权限暂停此监控项');
+      }
+
+      // Only owner or editor can pause
+      if (!permission.isOwner && permission.role !== 'editor') {
+        return forbidden(res, '您没有权限暂停此监控项');
+      }
+
+      // Check if collaborator has access to this monitor's group
+      if (!permission.isOwner && permission.accessibleGroupIds !== null) {
+        const hasAccess = await canAccessMonitor(id, ownerId, permission.accessibleGroupIds);
         if (!hasAccess) {
           return forbidden(res, '您没有权限暂停此监控项');
         }
-      }
-
-      const monitor = await queryOne<Monitor>(
-        'SELECT * FROM monitors WHERE id = ? AND owner_id = ?',
-        [id, ownerId]
-      );
-
-      if (!monitor) {
-        notFound(res, '监控项不存在');
-        return;
       }
 
       await execute(
@@ -690,9 +729,6 @@ router.post(
 router.post(
   '/:id/resume',
   authenticate,
-  projectContext(),
-  checkProjectPermission,
-  requireRole('editor'),
   [
     param('id').isUUID()
   ],
@@ -705,24 +741,41 @@ router.post(
       }
 
       const { id } = req.params;
-      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+      const userId = req.user!.userId;
+      const userEmail = req.user!.email;
 
-      // Check if collaborator has access to this monitor
-      if (!isOwner) {
-        const hasAccess = await canAccessMonitor(id, ownerId, accessibleGroupIds);
+      // First get monitor to check ownership
+      const monitorBasic = await queryOne<{ owner_id: string }>(
+        'SELECT owner_id FROM monitors WHERE id = ?',
+        [id]
+      );
+
+      if (!monitorBasic) {
+        notFound(res, '监控项不存在');
+        return;
+      }
+
+      const ownerId = monitorBasic.owner_id;
+
+      // Check permission
+      const { checkProjectPermission: checkPermission } = await import('../services/collaboration');
+      const permission = await checkPermission(userId, userEmail, ownerId);
+
+      if (!permission.isOwner && !permission.isCollaborator) {
+        return forbidden(res, '您没有权限恢复此监控项');
+      }
+
+      // Only owner or editor can resume
+      if (!permission.isOwner && permission.role !== 'editor') {
+        return forbidden(res, '您没有权限恢复此监控项');
+      }
+
+      // Check if collaborator has access to this monitor's group
+      if (!permission.isOwner && permission.accessibleGroupIds !== null) {
+        const hasAccess = await canAccessMonitor(id, ownerId, permission.accessibleGroupIds);
         if (!hasAccess) {
           return forbidden(res, '您没有权限恢复此监控项');
         }
-      }
-
-      const monitor = await queryOne<Monitor>(
-        'SELECT * FROM monitors WHERE id = ? AND owner_id = ?',
-        [id, ownerId]
-      );
-
-      if (!monitor) {
-        notFound(res, '监控项不存在');
-        return;
       }
 
       await execute(
@@ -742,8 +795,6 @@ router.post(
 router.post(
   '/:id/check',
   authenticate,
-  projectContext(),
-  checkProjectPermission,
   [
     param('id').isUUID()
   ],
@@ -756,11 +807,33 @@ router.post(
       }
 
       const { id } = req.params;
-      const { ownerId, isOwner, accessibleGroupIds } = req.projectContext!;
+      const userId = req.user!.userId;
+      const userEmail = req.user!.email;
 
-      // Check if collaborator has access to this monitor
-      if (!isOwner) {
-        const hasAccess = await canAccessMonitor(id, ownerId, accessibleGroupIds);
+      // First get monitor to check ownership
+      const monitorBasic = await queryOne<{ owner_id: string }>(
+        'SELECT owner_id FROM monitors WHERE id = ?',
+        [id]
+      );
+
+      if (!monitorBasic) {
+        notFound(res, '监控项不存在');
+        return;
+      }
+
+      const ownerId = monitorBasic.owner_id;
+
+      // Check permission
+      const { checkProjectPermission: checkPermission } = await import('../services/collaboration');
+      const permission = await checkPermission(userId, userEmail, ownerId);
+
+      if (!permission.isOwner && !permission.isCollaborator) {
+        return forbidden(res, '您没有权限检查此监控项');
+      }
+
+      // Check if collaborator has access to this monitor's group
+      if (!permission.isOwner && permission.accessibleGroupIds !== null) {
+        const hasAccess = await canAccessMonitor(id, ownerId, permission.accessibleGroupIds);
         if (!hasAccess) {
           return forbidden(res, '您没有权限检查此监控项');
         }

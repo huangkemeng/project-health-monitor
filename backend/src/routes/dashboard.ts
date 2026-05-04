@@ -6,128 +6,176 @@ import type { Monitor, Alert, DashboardData, DashboardSummary, DashboardMonitorI
 
 const router = Router();
 
-// Get dashboard data
+// Get dashboard data - aggregate all accessible projects
 router.get('/', authenticate, async (req, res) => {
   try {
     const userId = req.user!.userId;
+    const userEmail = req.user!.email;
     console.log('[Dashboard] Fetching data for user:', userId);
 
-    // Get summary counts
-    console.log('[Dashboard] Executing summary query...');
-    const summaryResult = await query<DashboardSummary>(
-      `SELECT
-        COUNT(*) as total,
-        SUM(CASE WHEN health_status = 'normal' AND status = 'active' THEN 1 ELSE 0 END) as normal,
-        SUM(CASE WHEN health_status = 'warning' AND status = 'active' THEN 1 ELSE 0 END) as warning,
-        SUM(CASE WHEN health_status = 'critical' AND status = 'active' THEN 1 ELSE 0 END) as critical,
-        SUM(CASE WHEN status = 'paused' THEN 1 ELSE 0 END) as paused
-       FROM monitors
-       WHERE owner_id = ? AND status != 'archived'`,
-      [userId]
-    );
-    console.log('[Dashboard] Summary result:', summaryResult);
+    // Get all accessible projects
+    const { getAccessibleProjects } = await import('../services/collaboration');
+    const accessibleProjects = await getAccessibleProjects(userId, userEmail);
+
+    // Aggregate data from all accessible projects
+    let totalMonitors = 0;
+    let normalMonitors = 0;
+    let warningMonitors = 0;
+    let criticalMonitors = 0;
+    let pausedMonitors = 0;
+    const allMonitorIds: string[] = [];
+    const allAlerts: AlertResponse[] = [];
+    const allMonitorItems: DashboardMonitorItem[] = [];
+
+    for (const project of accessibleProjects) {
+      // Build group filter for collaborators
+      let groupFilter = '';
+      const queryParams: any[] = [project.ownerId];
+
+      if (!project.isOwner && project.accessibleGroupIds !== null) {
+        if (project.accessibleGroupIds.length === 0) {
+          groupFilter = 'AND m.group_id IS NULL';
+        } else {
+          const placeholders = project.accessibleGroupIds.map(() => '?').join(',');
+          groupFilter = `AND (m.group_id IS NULL OR m.group_id IN (${placeholders}))`;
+          queryParams.push(...project.accessibleGroupIds);
+        }
+      }
+
+      // Get summary counts for this project
+      const summaryResult = await query<DashboardSummary>(
+        `SELECT
+          COUNT(*) as total,
+          SUM(CASE WHEN health_status = 'normal' AND status = 'active' THEN 1 ELSE 0 END) as normal,
+          SUM(CASE WHEN health_status = 'warning' AND status = 'active' THEN 1 ELSE 0 END) as warning,
+          SUM(CASE WHEN health_status = 'critical' AND status = 'active' THEN 1 ELSE 0 END) as critical,
+          SUM(CASE WHEN status = 'paused' THEN 1 ELSE 0 END) as paused
+         FROM monitors m
+         WHERE m.owner_id = ? AND m.status != 'archived' ${groupFilter}`,
+        queryParams
+      );
+
+      totalMonitors += Number(summaryResult[0]?.total) || 0;
+      normalMonitors += Number(summaryResult[0]?.normal) || 0;
+      warningMonitors += Number(summaryResult[0]?.warning) || 0;
+      criticalMonitors += Number(summaryResult[0]?.critical) || 0;
+      pausedMonitors += Number(summaryResult[0]?.paused) || 0;
+
+      // Get monitor IDs for 24h stats
+      const monitorIdsResult = await query<{ id: string }>(
+        `SELECT id FROM monitors m WHERE m.owner_id = ? ${groupFilter}`,
+        queryParams
+      );
+      allMonitorIds.push(...monitorIdsResult.map(m => m.id));
+
+      // Get recent alerts for this project
+      const recentAlerts = await query<Alert & { monitor_name: string; group_name: string | null }>(
+        `SELECT a.*, m.name as monitor_name, mg.name as group_name
+         FROM alerts a
+         JOIN monitors m ON a.monitor_id = m.id
+         LEFT JOIN monitor_groups mg ON m.group_id = mg.id
+         WHERE m.owner_id = ? ${groupFilter}
+         ORDER BY a.started_at DESC
+         LIMIT 10`,
+        queryParams
+      );
+
+      allAlerts.push(...recentAlerts.map(a => ({
+        id: a.id,
+        monitor_id: a.monitor_id,
+        monitor_name: a.monitor_name,
+        group_name: a.group_name,
+        alert_level: a.alert_level,
+        status: a.status,
+        resolved_reason: a.resolved_reason,
+        started_at: a.started_at,
+        ended_at: a.ended_at,
+        duration: a.duration,
+        send_status: a.send_status,
+        created_at: a.created_at
+      })));
+
+      // Get active monitors with latest status and group info
+      const monitors = await query<Monitor & { group_name: string | null }>(
+        `SELECT m.*, mg.name as group_name
+         FROM monitors m
+         LEFT JOIN monitor_groups mg ON m.group_id = mg.id
+         WHERE m.owner_id = ? AND m.status = 'active' ${groupFilter}
+         ORDER BY
+           CASE m.health_status
+             WHEN 'critical' THEN 1
+             WHEN 'warning' THEN 2
+             WHEN 'normal' THEN 3
+           END,
+           m.last_check_at DESC`,
+        queryParams
+      );
+
+      allMonitorItems.push(...monitors.map(m => ({
+        id: m.id,
+        name: m.name,
+        url: m.url,
+        health_status: m.health_status,
+        last_check_at: m.last_check_at,
+        last_response_time: m.last_response_time,
+        group_name: m.group_name,
+        is_own_project: project.isOwner,
+        role: project.role
+      })));
+    }
+
+    // Sort and limit alerts
+    allAlerts.sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
+    const recentAlerts = allAlerts.slice(0, 3);
+    const totalAlerts = allAlerts.length;
+
+    // Sort monitors by health status
+    allMonitorItems.sort((a, b) => {
+      const statusOrder = { critical: 1, warning: 2, normal: 3 };
+      return statusOrder[a.health_status] - statusOrder[b.health_status];
+    });
+
+    // Get 24h stats from check_logs for all accessible monitors
+    let totalChecks24h = 0;
+    let successChecks24h = 0;
+
+    if (allMonitorIds.length > 0) {
+      // Batch query for performance
+      const batchSize = 1000;
+      for (let i = 0; i < allMonitorIds.length; i += batchSize) {
+        const batch = allMonitorIds.slice(i, i + batchSize);
+        const placeholders = batch.map(() => '?').join(',');
+        const stats24h = await query<{ total_checks: number; success_checks: number }>(
+          `SELECT
+            COUNT(*) as total_checks,
+            SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_checks
+           FROM check_logs
+           WHERE monitor_id IN (${placeholders})
+             AND checked_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`,
+          batch
+        );
+        totalChecks24h += Number(stats24h[0]?.total_checks) || 0;
+        successChecks24h += Number(stats24h[0]?.success_checks) || 0;
+      }
+    }
+
+    const successRate24h = totalChecks24h > 0
+      ? Math.round((successChecks24h / totalChecks24h) * 100)
+      : 0;
 
     const summary: DashboardSummary = {
-      total: Number(summaryResult[0]?.total) || 0,
-      normal: Number(summaryResult[0]?.normal) || 0,
-      warning: Number(summaryResult[0]?.warning) || 0,
-      critical: Number(summaryResult[0]?.critical) || 0,
-      paused: Number(summaryResult[0]?.paused) || 0
+      total: totalMonitors,
+      normal: normalMonitors,
+      warning: warningMonitors,
+      critical: criticalMonitors,
+      paused: pausedMonitors
     };
-
-    // Get 24h stats from check_logs
-    console.log('[Dashboard] Executing 24h stats query...');
-    const stats24h = await query<{ total_checks: number; success_checks: number; success_rate: number }>(
-      `SELECT
-        COUNT(*) as total_checks,
-        SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_checks,
-        ROUND(SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) / COUNT(*) * 100, 1) as success_rate
-       FROM check_logs
-       WHERE monitor_id IN (SELECT id FROM monitors WHERE owner_id = ?)
-         AND checked_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`,
-      [userId]
-    );
-    console.log('[Dashboard] 24h stats:', stats24h);
-
-    // Get recent alerts (limit 3) and total count
-    console.log('[Dashboard] Executing alerts query...');
-    const recentAlerts = await query<Alert & { monitor_name: string; group_name: string | null }>(
-      `SELECT a.*, m.name as monitor_name, mg.name as group_name
-       FROM alerts a
-       JOIN monitors m ON a.monitor_id = m.id
-       LEFT JOIN monitor_groups mg ON m.group_id = mg.id
-       WHERE m.owner_id = ?
-       ORDER BY a.started_at DESC
-       LIMIT 3`,
-      [userId]
-    );
-    console.log('[Dashboard] Alerts result count:', recentAlerts.length);
-
-    // Get total alerts count
-    const totalAlertsResult = await query<{ total: number }>(
-      `SELECT COUNT(*) as total
-       FROM alerts a
-       JOIN monitors m ON a.monitor_id = m.id
-       WHERE m.owner_id = ?`,
-      [userId]
-    );
-    const totalAlerts = Number(totalAlertsResult[0]?.total) || 0;
-
-    const alertsResponse: AlertResponse[] = recentAlerts.map(a => ({
-      id: a.id,
-      monitor_id: a.monitor_id,
-      monitor_name: a.monitor_name,
-      group_name: a.group_name,
-      alert_level: a.alert_level,
-      status: a.status,
-      resolved_reason: a.resolved_reason,
-      started_at: a.started_at,
-      ended_at: a.ended_at,
-      duration: a.duration,
-      send_status: a.send_status,
-      created_at: a.created_at
-    }));
-
-    // Get active monitors with latest status and group info
-    console.log('[Dashboard] Executing monitors query...');
-    const monitors = await query<Monitor & { group_name: string | null }>(
-      `SELECT m.*, mg.name as group_name
-       FROM monitors m
-       LEFT JOIN monitor_groups mg ON m.group_id = mg.id
-       WHERE m.owner_id = ? AND m.status = 'active'
-       ORDER BY
-         CASE m.health_status
-           WHEN 'critical' THEN 1
-           WHEN 'warning' THEN 2
-           WHEN 'normal' THEN 3
-         END,
-         m.last_check_at DESC`,
-      [userId]
-    );
-    console.log('[Dashboard] Monitors result count:', monitors.length);
-
-    const monitorItems: DashboardMonitorItem[] = monitors.map(m => ({
-      id: m.id,
-      name: m.name,
-      url: m.url,
-      health_status: m.health_status,
-      last_check_at: m.last_check_at,
-      last_response_time: m.last_response_time,
-      group_name: m.group_name
-    }));
-
-    // Build stats object for frontend
-    const totalChecks24h = Number(stats24h[0]?.total_checks) || 0;
-    const successChecks24h = Number(stats24h[0]?.success_checks) || 0;
-    const successRate24h = totalChecks24h > 0 
-      ? Math.round((successChecks24h / totalChecks24h) * 100) 
-      : 0;
 
     const dashboardData: DashboardData = {
       summary,
-      recent_alerts: alertsResponse,
+      recent_alerts: recentAlerts,
       total_alerts: totalAlerts,
-      items: monitorItems,
+      items: allMonitorItems,
       stats: {
         total_monitors: summary.total,
         active_monitors: summary.total - summary.paused,
@@ -136,7 +184,7 @@ router.get('/', authenticate, async (req, res) => {
         total_checks_24h: totalChecks24h,
         success_rate_24h: successRate24h,
         success_rate: successRate24h,
-        avg_response_time_24h: 0 // TODO: calculate if needed
+        avg_response_time_24h: 0
       }
     };
 

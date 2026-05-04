@@ -140,6 +140,9 @@ export interface CheckLogResponse {
   response_time: number | null;
   error_msg: string | null;
   checked_at: Date;
+  // 权限相关字段
+  is_own_project?: boolean;
+  role?: CollaboratorRole | null;
 }
 
 // Alert Types
@@ -176,6 +179,9 @@ export interface AlertResponse {
   duration: number | null;
   send_status: SendStatus;
   created_at: Date;
+  // 权限相关字段
+  is_own_project?: boolean;
+  role?: CollaboratorRole | null;
 }
 
 // API Response Types
@@ -218,6 +224,9 @@ export interface DashboardMonitorItem {
   last_check_at: Date | null;
   last_response_time: number | null;
   group_name?: string | null;
+  // 权限相关字段
+  is_own_project?: boolean;
+  role?: CollaboratorRole | null;
 }
 
 export interface DashboardStats {

@@ -25,6 +25,11 @@ export function buildGroupFilter(req: Request): { condition: string; params: any
     return { condition: 'AND m.group_id IS NULL', params: [] };
   }
 
+  // 检查是否仅访问未分组 ('ungrouped')
+  if (accessibleGroupIds.length === 1 && accessibleGroupIds[0] === 'ungrouped') {
+    return { condition: 'AND m.group_id IS NULL', params: [] };
+  }
+
   // 可以访问指定分组 + 未分组
   const placeholders = accessibleGroupIds.map(() => '?').join(',');
   return {
@@ -47,6 +52,12 @@ export function buildGroupQueryFilter(req: Request): { condition: string; params
 
   if (!accessibleGroupIds || accessibleGroupIds.length === 0) {
     // 无分组权限，返回空结果
+    return { condition: 'AND 1=0', params: [] };
+  }
+
+  // 检查是否仅访问未分组 ('ungrouped')
+  if (accessibleGroupIds.length === 1 && accessibleGroupIds[0] === 'ungrouped') {
+    // 仅未分组权限，不返回任何分组
     return { condition: 'AND 1=0', params: [] };
   }
 

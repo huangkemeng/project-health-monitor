@@ -7,6 +7,7 @@ import { generateToken } from '../lib/auth';
 import { authenticate } from '../middleware/auth';
 import { success, error, created, validationError, unauthorized, forbidden } from '../utils/api-response';
 import { isValidUsername, isValidEmail, isValidPassword, sanitizeString } from '../utils/validators';
+import { linkCollaborationsOnRegistration } from '../services/collaboration';
 import type { User, UserResponse, LoginAttempt } from '../types';
 
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -107,6 +108,9 @@ router.post(
         error(res, '用户创建失败', 500);
         return;
       }
+
+      // 自动匹配协作关系
+      await linkCollaborationsOnRegistration(newUser.id, newUser.email);
 
       // Generate token
       const token = await generateToken({

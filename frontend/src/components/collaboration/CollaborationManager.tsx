@@ -265,6 +265,7 @@ export function CollaborationManager() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">所有分组</SelectItem>
+                    <SelectItem value="ungrouped">未分组</SelectItem>
                     {groups.map((group) => (
                       <SelectItem key={group.id} value={group.id}>
                         {group.name}
@@ -381,6 +382,7 @@ export function CollaborationManager() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">所有分组</SelectItem>
+                  <SelectItem value="ungrouped">未分组</SelectItem>
                   {groups.map((group) => (
                     <SelectItem key={group.id} value={group.id}>
                       {group.name}

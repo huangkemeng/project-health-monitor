@@ -38,12 +38,14 @@ const api: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 30000, // 30 second timeout
+  withCredentials: true, // 允许跨域请求携带 Cookie
 });
 
-// Request interceptor - add auth token
+// Request interceptor - add auth token and project context
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
+    const projectOwnerId = localStorage.getItem('project_context_owner_id');
     const isPublicEndpoint = PUBLIC_ENDPOINTS.some(endpoint =>
       config.url?.includes(endpoint)
     );
@@ -51,6 +53,12 @@ api.interceptors.request.use(
     if (token && !isPublicEndpoint) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // 添加项目上下文到请求头
+    if (projectOwnerId) {
+      config.headers['X-Project-Owner-Id'] = projectOwnerId;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

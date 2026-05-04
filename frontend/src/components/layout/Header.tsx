@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
-import { ProjectSwitcher } from "@/components/collaboration/ProjectSwitcher";
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -73,7 +72,6 @@ export function Header({ onMenuClick }: HeaderProps) {
         </nav>
 
         <div className="flex flex-1 items-center justify-end gap-3">
-          <ProjectSwitcher />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">

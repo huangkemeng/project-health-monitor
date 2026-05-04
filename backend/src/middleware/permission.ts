@@ -18,16 +18,23 @@ declare global {
   }
 }
 
+const PROJECT_CONTEXT_HEADER = 'x-project-owner-id';
+
 /**
  * 项目上下文中间件
- * 从URL参数或查询参数中获取要访问的项目所有者ID
+ * 优先从请求头获取项目上下文，如果没有则从URL参数或查询参数获取
  * 默认使用当前登录用户作为所有者
  */
 export function projectContext(
   paramName: string = 'ownerId'
 ): (req: Request, res: Response, next: NextFunction) => void {
   return (req: Request, res: Response, next: NextFunction) => {
-    const targetOwnerId = req.params[paramName] || req.query.ownerId || req.user?.userId;
+    // 优先从请求头获取，然后是URL参数、查询参数，最后是当前用户
+    const headerOwnerId = req.headers[PROJECT_CONTEXT_HEADER] as string | undefined;
+    const targetOwnerId = headerOwnerId ||
+                          req.params[paramName] ||
+                          req.query.ownerId ||
+                          req.user?.userId;
 
     if (!targetOwnerId) {
       return unauthorized(res, '无法确定项目所有者');

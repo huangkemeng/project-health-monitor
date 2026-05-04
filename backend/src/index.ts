@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { getDbHealth } from './lib/db';
 import { autoMigrate } from './lib/db/auto-migrate';
@@ -108,6 +109,7 @@ app.use('/api/', (req, res, next) => {
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

@@ -28,14 +28,18 @@ export function ProjectSwitcher() {
     try {
       setLoading(true);
       const data = await collaborationApi.listProjects();
-      setProjects(data.projects || []);
+      const projectsList = data.projects || [];
+      setProjects(projectsList);
 
       // Find current project
-      const current = (data.projects || []).find(
+      const current = projectsList.find(
         (p) => p.owner_id === data.current_project?.owner_id
       );
       if (current) {
         setCurrentProject(current);
+      } else if (projectsList.length > 0) {
+        // 如果没有找到当前项目，使用第一个项目
+        setCurrentProject(projectsList[0]);
       }
     } catch (error) {
       toast({
@@ -60,7 +64,8 @@ export function ProjectSwitcher() {
 
     try {
       setSwitching(true);
-      await collaborationApi.switchProject(project.owner_id);
+      // 保存到 localStorage
+      localStorage.setItem('project_context_owner_id', project.owner_id);
       setCurrentProject(project);
       toast({
         title: '切换成功',
@@ -110,8 +115,8 @@ export function ProjectSwitcher() {
     );
   }
 
-  // If no shared projects, show simple indicator
-  if (projects.length <= 1) {
+  // 如果没有项目，显示简单指示器
+  if (projects.length === 0) {
     return (
       <Button variant="ghost" size="sm" disabled>
         <FolderOpen className="mr-2 h-4 w-4" />
@@ -120,6 +125,31 @@ export function ProjectSwitcher() {
     );
   }
 
+  // 如果只有一个项目，显示不可点击的指示器（但显示当前项目信息）
+  if (projects.length === 1) {
+    return (
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        disabled
+        className="flex items-center gap-2"
+      >
+        {currentProject?.is_own_project ? (
+          <User className="h-4 w-4" />
+        ) : (
+          <Users className="h-4 w-4" />
+        )}
+        <span className="max-w-[120px] truncate">
+          {currentProject?.is_own_project
+            ? '我的项目'
+            : currentProject?.owner_username}
+        </span>
+        {getRoleBadge(currentProject?.role || 'owner')}
+      </Button>
+    );
+  }
+
+  // 多个项目时显示下拉菜单
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

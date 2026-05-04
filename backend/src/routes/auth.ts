@@ -90,34 +90,16 @@ router.post(
         }
       }
 
-      console.log('[Register] Starting password hash...');
       // Hash password
-      let passwordHash: string;
-      try {
-        passwordHash = await hashPassword(password);
-        console.log('[Register] Password hashed successfully');
-      } catch (hashErr) {
-        console.error('[Register] Password hash error:', hashErr);
-        throw new Error('Password hashing failed');
-      }
+      const passwordHash = await hashPassword(password);
 
-      console.log('[Register] Generating UUID...');
       // Create user
       const userId = uuidv4();
-      console.log('[Register] Generated userId:', userId);
-      
-      console.log('[Register] Executing INSERT...');
-      try {
-        await execute(
-          `INSERT INTO users (id, username, email, password_hash, is_active, created_at, updated_at)
-           VALUES (?, ?, ?, ?, 1, NOW(), NOW())`,
-          [userId, sanitizedUsername, sanitizedEmail, passwordHash]
-        );
-        console.log('[Register] INSERT executed successfully');
-      } catch (insertErr) {
-        console.error('[Register] INSERT error:', insertErr);
-        throw insertErr;
-      }
+      await execute(
+        `INSERT INTO users (id, username, email, password_hash, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 1, NOW(), NOW())`,
+        [userId, sanitizedUsername, sanitizedEmail, passwordHash]
+      );
 
       // Get created user
       const newUser = await queryOne<User>('SELECT * FROM users WHERE id = ?', [userId]);
@@ -126,16 +108,12 @@ router.post(
         return;
       }
 
-      console.log('New user created:', { id: newUser.id, username: newUser.username, email: newUser.email });
-
       // Generate token
       const token = await generateToken({
         userId: newUser.id,
         username: newUser.username,
         email: newUser.email
       });
-      
-      console.log('Token generated successfully');
 
       // Return user without password (match frontend expected format)
       const userResponse: UserResponse = {
@@ -149,8 +127,6 @@ router.post(
       created(res, { ...userResponse, token });
     } catch (err) {
       console.error('Registration error:', err);
-      console.error('Error details:', err instanceof Error ? err.message : String(err));
-      console.error('Error stack:', err instanceof Error ? err.stack : 'No stack');
       error(res, '注册失败，请稍后重试', 500);
     }
   }

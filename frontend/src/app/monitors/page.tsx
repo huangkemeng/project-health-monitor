@@ -25,6 +25,7 @@ import {
   Square,
   FolderInput,
   X,
+  RefreshCw,
 } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -104,6 +105,8 @@ interface MonitorCardProps {
   onPause: (id: string) => void;
   onResume: (id: string) => void;
   onDelete: (id: string) => void;
+  onCheck: (id: string) => void;
+  checking?: boolean;
   selectable?: boolean;
   selected?: boolean;
   onSelect?: (id: string) => void;
@@ -114,6 +117,8 @@ function MonitorCard({
   onPause,
   onResume,
   onDelete,
+  onCheck,
+  checking,
   selectable,
   selected,
   onSelect,
@@ -180,6 +185,13 @@ function MonitorCard({
                   编辑
                 </Link>
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onCheck(monitor.id)}
+                disabled={checking}
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-2", checking && "animate-spin")} />
+                {checking ? "检查中..." : "立即检查"}
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               {monitor.status === "active" ? (
                 <DropdownMenuItem onClick={() => onPause(monitor.id)}>
@@ -229,7 +241,8 @@ export default function MonitorsPage() {
     total_pages: 0,
   });
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  
+  const [checkingId, setCheckingId] = useState<string | null>(null);
+
   // Batch operation states
   const [batchMode, setBatchMode] = useState(false);
   const [selectedMonitors, setSelectedMonitors] = useState<Set<string>>(new Set());
@@ -300,6 +313,33 @@ export default function MonitorsPage() {
       fetchMonitors();
     } catch {
       toast({ title: "操作失败", variant: "destructive" });
+    }
+  };
+
+  const handleCheck = async (id: string) => {
+    try {
+      setCheckingId(id);
+      const response = await monitorsApi.check(id);
+      const { result } = response.data;
+
+      if (result.status === 'success') {
+        toast({
+          title: "检查完成",
+          description: `响应时间: ${result.response_time}ms`,
+          variant: "success"
+        });
+      } else {
+        toast({
+          title: "检查失败",
+          description: result.error_msg || '请求失败',
+          variant: "destructive"
+        });
+      }
+      fetchMonitors();
+    } catch {
+      toast({ title: "检查失败", variant: "destructive" });
+    } finally {
+      setCheckingId(null);
     }
   };
 
@@ -637,6 +677,8 @@ export default function MonitorsPage() {
                       onPause={handlePause}
                       onResume={handleResume}
                       onDelete={setDeleteId}
+                      onCheck={handleCheck}
+                      checking={checkingId === monitor.id}
                       selectable={batchMode}
                       selected={selectedMonitors.has(monitor.id)}
                       onSelect={handleToggleSelect}

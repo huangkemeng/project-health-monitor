@@ -184,6 +184,18 @@ export const monitorsApi = {
 
   resume: (id: string, config?: AxiosRequestConfig) =>
     apiClient.post<{ id: string; status: string }>(`/monitors/${id}/resume`, {}, config),
+
+  check: (id: string, config?: AxiosRequestConfig) =>
+    apiClient.post<{
+      message: string;
+      result: {
+        status: 'success' | 'failure';
+        http_code: number | null;
+        response_time: number | null;
+        error_msg: string | null;
+        health_status: 'normal' | 'warning' | 'critical';
+      }
+    }>(`/monitors/${id}/check`, {}, config),
 };
 
 // Dashboard API

@@ -97,7 +97,7 @@ router.post(
       const userId = uuidv4();
       await execute(
         `INSERT INTO users (id, username, email, password_hash, is_active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, true, NOW(), NOW())`,
+         VALUES (?, ?, ?, ?, 1, NOW(), NOW())`,
         [userId, sanitizedUsername, sanitizedEmail, passwordHash]
       );
 

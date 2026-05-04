@@ -54,6 +54,8 @@ app.set('trust proxy', 1);
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
+  'https://health-monitor-3wt6didtn-huangkemengs-projects.vercel.app',
+  'https://health-monitor.bin01.com',
   process.env.FRONTEND_URL,
 ].filter(Boolean); // Remove undefined values
 

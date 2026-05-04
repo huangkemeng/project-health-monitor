@@ -163,7 +163,7 @@ export default function LoginPage() {
         </Card>
 
         <p className="mt-8 text-center text-sm text-muted-foreground">
-          © 2024 Health Monitor. All rights reserved.
+          © 2026 Health Monitor. All rights reserved.
         </p>
       </div>
     </div>

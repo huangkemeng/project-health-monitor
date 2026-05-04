@@ -319,19 +319,18 @@ export default function MonitorsPage() {
   const handleCheck = async (id: string) => {
     try {
       setCheckingId(id);
-      const response = await monitorsApi.check(id);
-      const { result } = response.data;
+      const result = await monitorsApi.check(id);
 
-      if (result.status === 'success') {
+      if (result.result.status === 'success') {
         toast({
           title: "检查完成",
-          description: `响应时间: ${result.response_time}ms`,
+          description: `响应时间: ${result.result.response_time}ms`,
           variant: "success"
         });
       } else {
         toast({
           title: "检查失败",
-          description: result.error_msg || '请求失败',
+          description: result.result.error_msg || '请求失败',
           variant: "destructive"
         });
       }

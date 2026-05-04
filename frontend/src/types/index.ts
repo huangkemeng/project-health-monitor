@@ -63,6 +63,11 @@ export interface Monitor {
   owner_id?: string;
   is_own_project?: boolean;
   role?: 'owner' | 'editor' | 'viewer' | null;
+  // 来源用户（仅对共享项目显示）
+  owner?: {
+    username?: string;
+    email?: string;
+  };
 }
 
 export interface MonitorStats {
@@ -130,6 +135,11 @@ export interface MonitorGroup {
   owner_id?: string;
   is_own_project?: boolean;
   role?: 'owner' | 'editor' | 'viewer' | null;
+  // 来源用户（仅对共享项目显示）
+  owner?: {
+    username?: string;
+    email?: string;
+  };
 }
 
 export interface CreateGroupData {

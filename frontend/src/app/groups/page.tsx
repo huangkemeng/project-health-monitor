@@ -379,12 +379,19 @@ export default function GroupsPage() {
                           />
                         </div>
                         <div>
-                          <h3 className="font-semibold">{group.name}</h3>
-                          {group.is_default && (
-                            <Badge variant="secondary" className="text-xs">
-                              默认
-                            </Badge>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">{group.name}</h3>
+                            {group.is_default && (
+                              <Badge variant="secondary" className="text-xs">
+                                默认
+                              </Badge>
+                            )}
+                            {group.owner && (
+                              <Badge variant="outline" className="text-xs">
+                                来自: {group.owner.username || group.owner.email}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
                       {/* 只有所有者或编辑者可以编辑/删除分组，且不能操作默认分组 */}

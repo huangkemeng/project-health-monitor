@@ -97,8 +97,9 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
           // 只能访问未分组监控项 - 只返回默认分组
           groupFilter = 'AND g.is_default = TRUE';
         } else {
+          // 只能访问特定分组，不包括默认分组（除非明确授予）
           const placeholders = project.accessibleGroupIds.map(() => '?').join(',');
-          groupFilter = `AND (g.is_default = TRUE OR g.id IN (${placeholders}))`;
+          groupFilter = `AND g.id IN (${placeholders})`;
           queryParams.push(...project.accessibleGroupIds);
         }
       }
@@ -118,11 +119,14 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
           COUNT(m.id) as monitor_count,
           SUM(CASE WHEN m.health_status = 'normal' THEN 1 ELSE 0 END) as normal_count,
           SUM(CASE WHEN m.health_status = 'warning' THEN 1 ELSE 0 END) as warning_count,
-          SUM(CASE WHEN m.health_status = 'critical' THEN 1 ELSE 0 END) as critical_count
+          SUM(CASE WHEN m.health_status = 'critical' THEN 1 ELSE 0 END) as critical_count,
+          u.username as owner_username,
+          u.email as owner_email
         FROM monitor_groups g
         LEFT JOIN monitors m ON m.group_id = g.id AND m.status = 'active'
+        LEFT JOIN users u ON g.owner_id = u.id
         WHERE g.owner_id = ? ${groupFilter}
-        GROUP BY g.id
+        GROUP BY g.id, u.username, u.email
         ORDER BY g.is_default DESC, g.sort_order ASC, g.updated_at DESC`,
         queryParams
       );
@@ -135,13 +139,17 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
         color: g.color,
         is_default: g.is_default === 1,
         sort_order: g.sort_order,
-        is_own_project: g.owner_id === userId,
+        is_own_project: project.isOwner,
         role: project.role,
         monitor_count: parseInt(g.monitor_count) || 0,
         health_summary: {
           normal: parseInt(g.normal_count) || 0,
           warning: parseInt(g.warning_count) || 0,
           critical: parseInt(g.critical_count) || 0
+        },
+        owner: project.isOwner ? undefined : {
+          username: g.owner_username,
+          email: g.owner_email
         },
         created_at: g.created_at,
         updated_at: g.updated_at

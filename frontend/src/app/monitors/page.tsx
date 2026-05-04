@@ -143,6 +143,11 @@ function MonitorCard({
               {monitor.status === "paused" && (
                 <Badge variant="secondary">已暂停</Badge>
               )}
+              {monitor.owner && (
+                <Badge variant="outline" className="text-xs">
+                  来自: {monitor.owner.username || monitor.owner.email}
+                </Badge>
+              )}
             </div>
             <p className="text-sm text-muted-foreground truncate mb-2">
               {monitor.url}

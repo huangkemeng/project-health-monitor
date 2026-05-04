@@ -183,7 +183,14 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
               </Link>
             </Button>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">{monitor.name}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold tracking-tight">{monitor.name}</h1>
+                {monitor.owner && (
+                  <Badge variant="outline">
+                    来自: {monitor.owner.username || monitor.owner.email}
+                  </Badge>
+                )}
+              </div>
               <p className="text-muted-foreground text-sm">{monitor.url}</p>
             </div>
           </div>

@@ -72,6 +72,11 @@ export interface MonitorResponse {
   owner_id?: string;
   is_own_project?: boolean;
   role?: CollaboratorRole | null;
+  // 来源用户（仅对共享项目显示）
+  owner?: {
+    username?: string;
+    email?: string;
+  };
 }
 
 export interface MonitorStats {

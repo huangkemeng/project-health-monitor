@@ -108,11 +108,13 @@ router.get(
         const whereClause = conditions.join(' AND ');
 
         // Get monitors for this project
-        const monitors = await query<Monitor>(
-          `SELECT m.*, w.name as webhook_name, g.name as group_name, g.color as group_color
+        const monitors = await query<Monitor & { owner_username?: string; owner_email?: string }>(
+          `SELECT m.*, w.name as webhook_name, g.name as group_name, g.color as group_color,
+                  u.username as owner_username, u.email as owner_email
            FROM monitors m
            LEFT JOIN webhooks w ON m.webhook_id = w.id
            LEFT JOIN monitor_groups g ON m.group_id = g.id
+           LEFT JOIN users u ON m.owner_id = u.id
            WHERE ${whereClause}
            ORDER BY m.created_at DESC`,
           values
@@ -122,7 +124,11 @@ router.get(
         allMonitors.push(...monitors.map(m => ({
           ...m,
           is_own_project: project.isOwner,
-          role: project.role
+          role: project.role,
+          owner: project.isOwner ? undefined : {
+            username: m.owner_username,
+            email: m.owner_email
+          }
         })));
       }
 
@@ -194,12 +200,14 @@ router.get(
         }
       }
 
-      const monitor = await queryOne<Monitor & { webhook_name?: string; webhook_url?: string; at_users?: string | null; is_default?: boolean; webhook_created_at?: Date; webhook_updated_at?: Date }>(
+      const monitor = await queryOne<Monitor & { webhook_name?: string; webhook_url?: string; at_users?: string | null; is_default?: boolean; webhook_created_at?: Date; webhook_updated_at?: Date; owner_username?: string; owner_email?: string }>(
         `SELECT m.*,
                 w.name as webhook_name, w.webhook_url, w.at_users, w.is_default,
-                w.created_at as webhook_created_at, w.updated_at as webhook_updated_at
+                w.created_at as webhook_created_at, w.updated_at as webhook_updated_at,
+                u.username as owner_username, u.email as owner_email
          FROM monitors m
          LEFT JOIN webhooks w ON m.webhook_id = w.id
+         LEFT JOIN users u ON m.owner_id = u.id
          WHERE m.id = ? AND m.owner_id = ?`,
         [id, ownerId]
       );
@@ -248,6 +256,10 @@ router.get(
         owner_id: ownerId,
         is_own_project: permission.isOwner,
         role: permission.role,
+        owner: permission.isOwner ? undefined : {
+          username: monitor.owner_username,
+          email: monitor.owner_email
+        },
         webhook: monitor.webhook_id ? {
           id: monitor.webhook_id,
           name: monitor.webhook_name || '',

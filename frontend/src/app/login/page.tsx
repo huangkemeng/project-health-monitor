@@ -165,6 +165,16 @@ export default function LoginPage() {
         <p className="mt-8 text-center text-sm text-muted-foreground">
           © 2026 Health Monitor. All rights reserved.
         </p>
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          <a
+            href="https://github.com/huangkemeng/project-health-monitor"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-primary transition-colors"
+          >
+            开源项目地址
+          </a>
+        </p>
       </div>
     </div>
   );

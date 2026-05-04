@@ -90,16 +90,34 @@ router.post(
         }
       }
 
+      console.log('[Register] Starting password hash...');
       // Hash password
-      const passwordHash = await hashPassword(password);
+      let passwordHash: string;
+      try {
+        passwordHash = await hashPassword(password);
+        console.log('[Register] Password hashed successfully');
+      } catch (hashErr) {
+        console.error('[Register] Password hash error:', hashErr);
+        throw new Error('Password hashing failed');
+      }
 
+      console.log('[Register] Generating UUID...');
       // Create user
       const userId = uuidv4();
-      await execute(
-        `INSERT INTO users (id, username, email, password_hash, is_active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 1, NOW(), NOW())`,
-        [userId, sanitizedUsername, sanitizedEmail, passwordHash]
-      );
+      console.log('[Register] Generated userId:', userId);
+      
+      console.log('[Register] Executing INSERT...');
+      try {
+        await execute(
+          `INSERT INTO users (id, username, email, password_hash, is_active, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 1, NOW(), NOW())`,
+          [userId, sanitizedUsername, sanitizedEmail, passwordHash]
+        );
+        console.log('[Register] INSERT executed successfully');
+      } catch (insertErr) {
+        console.error('[Register] INSERT error:', insertErr);
+        throw insertErr;
+      }
 
       // Get created user
       const newUser = await queryOne<User>('SELECT * FROM users WHERE id = ?', [userId]);

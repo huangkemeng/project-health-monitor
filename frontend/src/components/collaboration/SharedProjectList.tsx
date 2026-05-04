@@ -32,7 +32,7 @@ export function SharedProjectList({ onSwitchProject }: SharedProjectListProps) {
     try {
       setLoading(true);
       const data = await collaborationApi.listSharedProjects();
-      setProjects(data);
+      setProjects(data || []);
     } catch (error) {
       toast({
         title: '加载失败',

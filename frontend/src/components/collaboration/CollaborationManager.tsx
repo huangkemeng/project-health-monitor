@@ -69,8 +69,8 @@ export function CollaborationManager() {
         collaborationApi.listCollaborators(),
         groupsApi.list(),
       ]);
-      setCollaborators(collaboratorsData.items);
-      setGroups(groupsData.items);
+      setCollaborators(collaboratorsData.items || []);
+      setGroups(groupsData.items || []);
     } catch (error) {
       toast({
         title: '加载失败',
@@ -267,8 +267,8 @@ export function CollaborationManager() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">所有分组</SelectItem>
-                    <SelectItem value="ungrouped">未分组</SelectItem>
-                    {groups.map((group) => (
+                    <SelectItem value="ungrouped">仅未分组</SelectItem>
+                    {groups.filter(g => !g.is_default).map((group) => (
                       <SelectItem key={group.id} value={group.id}>
                         {group.name}
                       </SelectItem>
@@ -388,8 +388,8 @@ export function CollaborationManager() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">所有分组</SelectItem>
-                  <SelectItem value="ungrouped">未分组</SelectItem>
-                  {groups.map((group) => (
+                  <SelectItem value="ungrouped">仅未分组</SelectItem>
+                  {groups.filter(g => !g.is_default).map((group) => (
                     <SelectItem key={group.id} value={group.id}>
                       {group.name}
                     </SelectItem>

@@ -28,11 +28,11 @@ export function ProjectSwitcher() {
     try {
       setLoading(true);
       const data = await collaborationApi.listProjects();
-      setProjects(data.projects);
+      setProjects(data.projects || []);
 
       // Find current project
-      const current = data.projects.find(
-        (p) => p.owner_id === data.current_project.owner_id
+      const current = (data.projects || []).find(
+        (p) => p.owner_id === data.current_project?.owner_id
       );
       if (current) {
         setCurrentProject(current);

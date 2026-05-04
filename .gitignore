@@ -141,3 +141,4 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
+.env*.local

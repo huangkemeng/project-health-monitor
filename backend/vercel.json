@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "name": "project-health-monitor-backend",
   "builds": [
     {
       "src": "src/index.ts",
@@ -11,12 +10,6 @@
     {
       "src": "/(.*)",
       "dest": "src/index.ts"
-    }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron/check",
-      "schedule": "* * * * *"
     }
   ]
 }

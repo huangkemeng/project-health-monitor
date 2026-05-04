@@ -1,0 +1,29 @@
+name: Health Check Monitor
+
+on:
+  schedule:
+    # Run every minute
+    - cron: '* * * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Health Check
+        run: |
+          curl -X POST \
+            "https://${{ vars.VERCEL_DOMAIN }}/api/cron/check?secret=${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail \
+            --silent \
+            --show-error \
+            --max-time 30
+
+      - name: Log Success
+        if: success()
+        run: echo "Health check triggered successfully at $(date)"
+
+      - name: Log Failure
+        if: failure()
+        run: echo "Health check failed at $(date)"

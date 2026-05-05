@@ -108,9 +108,9 @@ export function FeedbackNotificationList({
                   {typeIcons[notification.type] || <Bell className="h-4 w-4" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{notification.title}</p>
+                  <p className="text-sm font-medium line-clamp-2">{notification.title}</p>
                   {notification.content && (
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
                       {notification.content}
                     </p>
                   )}

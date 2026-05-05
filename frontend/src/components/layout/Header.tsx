@@ -93,7 +93,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             <PopoverTrigger asChild>
               <FeedbackNotificationBadge unreadCount={unreadCount} onClick={() => setNotificationOpen(true)} />
             </PopoverTrigger>
-            <PopoverContent className="p-0" align="end" sideOffset={8}>
+            <PopoverContent className="p-0 w-80" align="end" sideOffset={8}>
               <FeedbackNotificationList
                 notifications={notifications}
                 loading={loading}

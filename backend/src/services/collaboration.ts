@@ -92,6 +92,14 @@ export async function inviteCollaborator(
         );
 
         collaboratorId = existingRecord.id;
+
+        // 如果用户已注册，清除拒绝记录
+        if (collaboratorUserId) {
+          await connection.execute(
+            `DELETE FROM project_rejections WHERE user_id = ? AND project_owner_id = ?`,
+            [collaboratorUserId, ownerId]
+          );
+        }
       }
     } else {
       // 检查被邀请者是否为自己
@@ -357,16 +365,36 @@ export async function removeCollaborator(
   collaboratorId: string,
   ownerId: string
 ): Promise<void> {
-  const [result] = await pool.execute(
-    `UPDATE project_collaborators 
-     SET status = 'removed', 
-         updated_at = NOW() 
-     WHERE id = ? AND project_owner_id = ?`,
-    [collaboratorId, ownerId]
-  );
+  const connection = await pool.getConnection();
 
-  if ((result as any).affectedRows === 0) {
-    throw new Error('协作者不存在');
+  try {
+    await connection.beginTransaction();
+
+    // 先删除关联的分组记录
+    await connection.execute(
+      'DELETE FROM project_collaborator_groups WHERE collaborator_id = ?',
+      [collaboratorId]
+    );
+
+    // 更新协作者状态为 removed
+    const [result] = await connection.execute(
+      `UPDATE project_collaborators 
+       SET status = 'removed', 
+           updated_at = NOW() 
+       WHERE id = ? AND project_owner_id = ?`,
+      [collaboratorId, ownerId]
+    );
+
+    if ((result as any).affectedRows === 0) {
+      throw new Error('协作者不存在');
+    }
+
+    await connection.commit();
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
   }
 }
 

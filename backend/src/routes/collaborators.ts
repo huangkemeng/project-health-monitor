@@ -119,10 +119,11 @@ router.delete(
       await collaborationService.removeCollaborator(id, ownerId);
       success(res, null, '移除成功');
     } catch (err: any) {
+      console.error('移除协作者失败:', err);
       if (err.message === '协作者不存在') {
         return error(res, err.message, 404);
       }
-      error(res, '移除失败', 500);
+      error(res, err.message || '移除失败', 500);
     }
   }
 );

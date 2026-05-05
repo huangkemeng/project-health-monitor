@@ -709,7 +709,7 @@ export default function MonitorsPage() {
                       selectable={batchMode}
                       selected={selectedMonitors.has(monitor.id)}
                       onSelect={handleToggleSelect}
-                      canEdit={monitor.role === 'owner' || monitor.role === 'editor'}
+                      canEdit={monitor.is_own_project || monitor.role === 'editor'}
                     />
                   ))}
                 </div>

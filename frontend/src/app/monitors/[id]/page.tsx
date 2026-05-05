@@ -195,7 +195,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {(monitor.role === 'owner' || monitor.role === 'editor') && (
+            {(monitor.is_own_project || monitor.role === 'editor') && (
               <>
                 {monitor.status === "active" ? (
                   <Button variant="outline" onClick={handlePause}>

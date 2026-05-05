@@ -28,6 +28,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { useProject } from "@/hooks/useProject";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,6 +111,7 @@ interface MonitorCardProps {
   selectable?: boolean;
   selected?: boolean;
   onSelect?: (id: string) => void;
+  canEdit?: boolean;
 }
 
 function MonitorCard({
@@ -122,6 +124,7 @@ function MonitorCard({
   selectable,
   selected,
   onSelect,
+  canEdit = true,
 }: MonitorCardProps) {
   return (
     <Card className={cn(
@@ -184,12 +187,14 @@ function MonitorCard({
                   查看详情
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={`/monitors/${monitor.id}/edit`}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  编辑
-                </Link>
-              </DropdownMenuItem>
+              {canEdit && (
+                <DropdownMenuItem asChild>
+                  <Link href={`/monitors/${monitor.id}/edit`}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    编辑
+                  </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onClick={() => onCheck(monitor.id)}
                 disabled={checking}
@@ -197,26 +202,30 @@ function MonitorCard({
                 <RefreshCw className={cn("h-4 w-4 mr-2", checking && "animate-spin")} />
                 {checking ? "检查中..." : "立即检查"}
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {monitor.status === "active" ? (
-                <DropdownMenuItem onClick={() => onPause(monitor.id)}>
-                  <Pause className="h-4 w-4 mr-2" />
-                  暂停监控
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem onClick={() => onResume(monitor.id)}>
-                  <Play className="h-4 w-4 mr-2" />
-                  恢复监控
-                </DropdownMenuItem>
+              {canEdit && (
+                <>
+                  <DropdownMenuSeparator />
+                  {monitor.status === "active" ? (
+                    <DropdownMenuItem onClick={() => onPause(monitor.id)}>
+                      <Pause className="h-4 w-4 mr-2" />
+                      暂停监控
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onClick={() => onResume(monitor.id)}>
+                      <Play className="h-4 w-4 mr-2" />
+                      恢复监控
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => onDelete(monitor.id)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    删除
+                  </DropdownMenuItem>
+                </>
               )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => onDelete(monitor.id)}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                删除
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -229,6 +238,7 @@ export default function MonitorsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { canEdit } = useProject();
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [groups, setGroups] = useState<MonitorGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -495,16 +505,20 @@ export default function MonitorsPage() {
               <div className="flex gap-2">
                 {!batchMode ? (
                   <>
-                    <Button variant="outline" onClick={() => setBatchMode(true)}>
-                      <CheckSquare className="h-4 w-4 mr-2" />
-                      批量操作
-                    </Button>
-                    <Button asChild>
-                      <Link href="/monitors/new">
-                        <Plus className="h-4 w-4 mr-2" />
-                        新建监控
-                      </Link>
-                    </Button>
+                    {canEdit && (
+                      <Button variant="outline" onClick={() => setBatchMode(true)}>
+                        <CheckSquare className="h-4 w-4 mr-2" />
+                        批量操作
+                      </Button>
+                    )}
+                    {canEdit && (
+                      <Button asChild>
+                        <Link href="/monitors/new">
+                          <Plus className="h-4 w-4 mr-2" />
+                          新建监控
+                        </Link>
+                      </Button>
+                    )}
                   </>
                 ) : (
                   <Button variant="outline" onClick={() => {
@@ -663,12 +677,14 @@ export default function MonitorsPage() {
                   <p className="text-muted-foreground mb-4">
                     {selectedGroup ? "将监控项移动到这个分组" : "创建您的第一个监控任务"}
                   </p>
-                  <Button asChild>
-                    <Link href="/monitors/new">
-                      <Plus className="h-4 w-4 mr-2" />
-                      新建监控
-                    </Link>
-                  </Button>
+                  {canEdit && (
+                    <Button asChild>
+                      <Link href="/monitors/new">
+                        <Plus className="h-4 w-4 mr-2" />
+                        新建监控
+                      </Link>
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ) : (
@@ -686,6 +702,7 @@ export default function MonitorsPage() {
                       selectable={batchMode}
                       selected={selectedMonitors.has(monitor.id)}
                       onSelect={handleToggleSelect}
+                      canEdit={canEdit}
                     />
                   ))}
                 </div>

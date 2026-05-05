@@ -171,31 +171,83 @@ router.post('/switch', authenticate, async (req: Request, res: Response) => {
 /**
  * GET /api/projects/current
  * 获取当前项目上下文信息
+ * Query: ?owner_id=xxx (可选，默认返回用户自己的项目)
  */
 router.get('/current', authenticate, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
     const userEmail = req.user!.email;
+    const targetOwnerId = req.query.owner_id as string;
 
-    // 默认返回用户自己的项目信息
-    const user = await queryOne(
-      'SELECT id, username, email FROM users WHERE id = ?',
-      [userId]
+    // 如果没有指定 owner_id 或指定的是自己的项目
+    if (!targetOwnerId || targetOwnerId === userId) {
+      const user = await queryOne(
+        'SELECT id, username, email FROM users WHERE id = ?',
+        [userId]
+      );
+
+      if (!user) {
+        return error(res, '用户不存在', 404);
+      }
+
+      return success(res, {
+        project: {
+          owner_id: userId,
+          owner_username: (user as any).username,
+          owner_email: (user as any).email,
+          role: 'owner',
+          accessible_groups: [],
+          is_own_project: true,
+        },
+      });
+    }
+
+    // 检查是否有权限访问指定的项目
+    const permission = await collaborationService.checkProjectPermission(
+      userId,
+      userEmail,
+      targetOwnerId
     );
 
-    if (!user) {
-      return error(res, '用户不存在', 404);
+    if (!permission.isCollaborator) {
+      return error(res, '您没有权限访问此项目', 403);
+    }
+
+    // 获取项目所有者信息
+    const owner = await queryOne(
+      'SELECT id, username, email FROM users WHERE id = ?',
+      [targetOwnerId]
+    );
+
+    if (!owner) {
+      return error(res, '项目所有者不存在', 404);
+    }
+
+    // 获取可访问的分组信息
+    let accessibleGroups: { id: string; name: string }[] = [];
+    if (permission.accessibleGroupIds === null) {
+      const groups = await query(
+        'SELECT id, name FROM monitor_groups WHERE owner_id = ?',
+        [targetOwnerId]
+      );
+      accessibleGroups = (groups as any[]).map((g) => ({ id: g.id, name: g.name }));
+    } else if (permission.accessibleGroupIds.length > 0) {
+      const placeholders = permission.accessibleGroupIds.map(() => '?').join(',');
+      const groups = await query(
+        `SELECT id, name FROM monitor_groups WHERE owner_id = ? AND id IN (${placeholders})`,
+        [targetOwnerId, ...permission.accessibleGroupIds]
+      );
+      accessibleGroups = (groups as any[]).map((g) => ({ id: g.id, name: g.name }));
     }
 
     success(res, {
       project: {
-        owner_id: userId,
-        owner_username: (user as any).username,
-        owner_email: (user as any).email,
-        role: 'owner',
-        group_id: null,
-        group_name: null,
-        is_own_project: true,
+        owner_id: targetOwnerId,
+        owner_username: (owner as any).username,
+        owner_email: (owner as any).email,
+        role: permission.role,
+        accessible_groups: accessibleGroups,
+        is_own_project: false,
       },
     });
   } catch (err) {

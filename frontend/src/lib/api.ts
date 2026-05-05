@@ -276,8 +276,8 @@ export const collaborationApi = {
   switchProject: (ownerId: string, config?: AxiosRequestConfig) =>
     apiClient.post<{ project: ProjectContext; message: string }>('/projects/switch', { owner_id: ownerId }, config),
 
-  getCurrentProject: (config?: AxiosRequestConfig) =>
-    apiClient.get<{ project: ProjectContext }>('/projects/current', config),
+  getCurrentProject: (ownerId?: string, config?: AxiosRequestConfig) =>
+    apiClient.get<{ project: ProjectContext }>('/projects/current', { params: ownerId ? { owner_id: ownerId } : undefined, ...config }),
 };
 
 export default api;

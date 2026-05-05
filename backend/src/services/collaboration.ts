@@ -416,30 +416,29 @@ export async function getSharedProjects(
     [userId, userEmail]
   );
 
-  // 查询用户有权限访问的共享项目（排除已拒绝的）
-  // 使用子查询获取每个项目的最高权限和最早加入时间
+  // 查询用户的所有共享项目（包括已拒绝/被撤销的），取最新的记录
   const [rows] = await pool.execute(
     `SELECT
       u.id as owner_id,
       u.username as owner_username,
       u.email as owner_email,
-      pc_agg.role,
-      pc_agg.joined_at
-     FROM (
-       SELECT
-         project_owner_id,
-         MAX(CASE WHEN role = 'editor' THEN 'editor' ELSE 'viewer' END) as role,
-         MIN(created_at) as joined_at
-       FROM project_collaborators
-       WHERE (collaborator_user_id = ? OR collaborator_email = ?)
-         AND status = 'active'
-       GROUP BY project_owner_id
-     ) pc_agg
-     JOIN users u ON pc_agg.project_owner_id = u.id
-     LEFT JOIN project_rejections pr ON pr.user_id = ? AND pr.project_owner_id = pc_agg.project_owner_id
-     WHERE pr.id IS NULL
-     ORDER BY pc_agg.joined_at DESC`,
-    [userId, userEmail, userId]
+      pc.role,
+      pc.status,
+      pc.created_at as joined_at,
+      pr.id as rejection_id
+     FROM project_collaborators pc
+     JOIN users u ON pc.project_owner_id = u.id
+     LEFT JOIN project_rejections pr ON pr.user_id = ? AND pr.project_owner_id = pc.project_owner_id
+     WHERE (pc.collaborator_user_id = ? OR pc.collaborator_email = ?)
+       AND pc.id = (
+         SELECT id FROM project_collaborators
+         WHERE project_owner_id = pc.project_owner_id
+           AND (collaborator_user_id = ? OR collaborator_email = ?)
+         ORDER BY created_at DESC
+         LIMIT 1
+       )
+     ORDER BY pc.created_at DESC`,
+    [userId, userEmail, userId, userId, userEmail, userId, userEmail]
   );
 
   const projects = rows as any[];
@@ -447,7 +446,19 @@ export async function getSharedProjects(
   // 为每个项目获取分组信息
   const result: SharedProject[] = [];
   for (const project of projects) {
-    // 获取该项目的所有协作者记录ID
+    // 确定显示状态
+    let displayStatus: SharedProject['status'];
+    if (project.rejection_id) {
+      displayStatus = 'rejected';
+    } else if (project.status === 'removed') {
+      displayStatus = 'removed';
+    } else if (project.status === 'active') {
+      displayStatus = 'active';
+    } else {
+      displayStatus = 'pending';
+    }
+
+    // 获取该项目的活跃协作者记录ID（用于获取分组信息）
     const [collabRows] = await pool.execute(
       `SELECT id FROM project_collaborators
        WHERE project_owner_id = ?
@@ -487,6 +498,7 @@ export async function getSharedProjects(
       role: project.role,
       groups: groups,
       joined_at: project.joined_at,
+      status: displayStatus,
     });
   }
 
@@ -525,6 +537,72 @@ export async function rejectProject(
          ))`,
       [ownerId, userId, userId]
     );
+
+    await connection.commit();
+
+    // 清除权限缓存
+    clearPermissionCache(userId, ownerId);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+/**
+ * 用户接受/重新加入共享项目
+ * @param userId 当前用户ID
+ * @param userEmail 当前用户邮箱
+ * @param ownerId 项目所有者ID
+ */
+export async function acceptProject(
+  userId: string,
+  userEmail: string,
+  ownerId: string
+): Promise<void> {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // 删除拒绝记录
+    await connection.execute(
+      `DELETE FROM project_rejections WHERE user_id = ? AND project_owner_id = ?`,
+      [userId, ownerId]
+    );
+
+    // 检查是否已有协作记录
+    const [existing] = await connection.execute(
+      `SELECT id, status FROM project_collaborators
+       WHERE project_owner_id = ?
+         AND (collaborator_user_id = ? OR collaborator_email = ?)
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [ownerId, userId, userEmail]
+    );
+
+    const existingRecord = (existing as any[])[0];
+
+    if (existingRecord) {
+      // 更新现有记录为 active
+      await connection.execute(
+        `UPDATE project_collaborators
+         SET status = 'active',
+             collaborator_user_id = ?,
+             updated_at = NOW()
+         WHERE id = ?`,
+        [userId, existingRecord.id]
+      );
+    } else {
+      // 创建新的协作记录（默认 viewer 权限）
+      await connection.execute(
+        `INSERT INTO project_collaborators
+         (id, project_owner_id, collaborator_email, collaborator_user_id, role, status)
+         VALUES (UUID(), ?, ?, ?, 'viewer', 'active')`,
+        [ownerId, userEmail, userId]
+      );
+    }
 
     await connection.commit();
 

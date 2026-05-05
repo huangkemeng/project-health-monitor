@@ -49,4 +49,30 @@ router.post(
   }
 );
 
+/**
+ * POST /api/shared-projects/:ownerId/accept
+ * 接受/重新加入共享项目
+ */
+router.post(
+  '/:ownerId/accept',
+  authenticate,
+  [
+    param('ownerId').isUUID().withMessage('无效的项目所有者ID'),
+    validate
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      const userId = req.user!.userId;
+      const userEmail = req.user!.email;
+      const { ownerId } = req.params;
+
+      await collaborationService.acceptProject(userId, userEmail, ownerId);
+      success(res, { message: '已重新加入项目' });
+    } catch (err: any) {
+      console.error('Accept project error:', err);
+      error(res, err.message || '接受项目失败', 500);
+    }
+  }
+);
+
 export default router;

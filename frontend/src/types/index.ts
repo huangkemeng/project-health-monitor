@@ -369,6 +369,7 @@ export interface SharedProject {
   role: CollaboratorRole | 'owner';
   groups: CollaboratorGroup[];
   joined_at: string;
+  status: 'active' | 'rejected' | 'removed' | 'pending';
   is_own_project?: boolean;
 }
 

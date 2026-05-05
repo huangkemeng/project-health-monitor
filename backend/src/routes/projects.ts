@@ -47,6 +47,7 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
         role: 'owner',
         groups: [],
         joined_at: ownProject.joined_at,
+        status: 'active',
         is_own_project: true,
       });
     }

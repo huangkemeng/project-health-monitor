@@ -350,6 +350,7 @@ export interface SharedProject {
   role: CollaboratorRole | 'owner';
   groups: CollaboratorGroup[];
   joined_at: Date;
+  status: 'active' | 'rejected' | 'removed' | 'pending';
 }
 
 // Permission check result

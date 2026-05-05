@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FolderOpen, XCircle, User, Shield, Eye, RefreshCw } from 'lucide-react';
+import { FolderOpen, XCircle, User, Shield, Eye, RefreshCw, RotateCcw } from 'lucide-react';
 import { collaborationApi } from '@/lib/api';
 import { SharedProject, CollaboratorRole } from '@/types';
 
@@ -69,6 +69,30 @@ export function SharedProjectList() {
     }
   };
 
+  const handleRejoin = async (project: SharedProject) => {
+    if (!confirm(`确定要重新加入 ${project.owner_username} 的共享项目吗？`)) {
+      return;
+    }
+
+    try {
+      setRejecting(project.owner_id);
+      await collaborationApi.acceptProject(project.owner_id);
+      toast({
+        title: '已重新加入',
+        description: `已重新加入 ${project.owner_username} 的项目共享`,
+      });
+      loadProjects();
+    } catch (error: any) {
+      toast({
+        title: '操作失败',
+        description: error.message || '无法重新加入项目',
+        variant: 'destructive',
+      });
+    } finally {
+      setRejecting(null);
+    }
+  };
+
   const getRoleBadge = (role: CollaboratorRole | 'owner') => {
     switch (role) {
       case 'owner':
@@ -90,6 +114,37 @@ export function SharedProjectList() {
           <Badge variant="secondary">
             <Eye className="mr-1 h-3 w-3" />
             查看者
+          </Badge>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const getStatusBadge = (status: SharedProject['status']) => {
+    switch (status) {
+      case 'active':
+        return (
+          <Badge variant="default" className="bg-green-500">
+            已加入
+          </Badge>
+        );
+      case 'rejected':
+        return (
+          <Badge variant="destructive">
+            已拒绝
+          </Badge>
+        );
+      case 'removed':
+        return (
+          <Badge variant="secondary">
+            被撤销
+          </Badge>
+        );
+      case 'pending':
+        return (
+          <Badge variant="outline">
+            待接受
           </Badge>
         );
       default:
@@ -156,6 +211,7 @@ export function SharedProjectList() {
                 <TableHead>您的权限</TableHead>
                 <TableHead>可访问分组</TableHead>
                 <TableHead>加入时间</TableHead>
+                <TableHead>状态</TableHead>
                 <TableHead className="w-[120px]">操作</TableHead>
               </TableRow>
             </TableHeader>
@@ -169,17 +225,30 @@ export function SharedProjectList() {
                   <TableCell>
                     {new Date(project.joined_at).toLocaleDateString('zh-CN')}
                   </TableCell>
+                  <TableCell>{getStatusBadge(project.status)}</TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleReject(project)}
-                      disabled={rejecting === project.owner_id}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <XCircle className="h-4 w-4 mr-1" />
-                      拒绝
-                    </Button>
+                    {project.status === 'active' ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleReject(project)}
+                        disabled={rejecting === project.owner_id}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <XCircle className="h-4 w-4 mr-1" />
+                        拒绝
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRejoin(project)}
+                        disabled={rejecting === project.owner_id}
+                      >
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        重新加入
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

@@ -266,6 +266,9 @@ export const collaborationApi = {
   rejectProject: (ownerId: string, config?: AxiosRequestConfig) =>
     apiClient.post(`/shared-projects/${ownerId}/reject`, {}, config),
 
+  acceptProject: (ownerId: string, config?: AxiosRequestConfig) =>
+    apiClient.post(`/shared-projects/${ownerId}/accept`, {}, config),
+
   // Projects
   listProjects: (config?: AxiosRequestConfig) =>
     apiClient.get<{ projects: SharedProject[]; current_project: { owner_id: string; owner_email: string; is_own: boolean } }>('/projects', config),

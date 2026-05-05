@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Bell, History, Settings, Webhook, X, FolderOpen, MessageCircle } from "lucide-react";
+import { Activity, Bell, History, Settings, Webhook, X, FolderOpen, MessageCircle, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,13 +12,16 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useAuth } from "@/hooks/useAuth";
 
 interface SidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
 }
 
-const navItems = [
+const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "").split(",").map(e => e.trim()).filter(Boolean);
+
+const commonNavItems = [
   { href: "/dashboard", label: "仪表盘", icon: Activity },
   { href: "/monitors", label: "监控项", icon: Bell },
   { href: "/groups", label: "分组管理", icon: FolderOpen },
@@ -28,27 +31,43 @@ const navItems = [
   { href: "/settings", label: "设置", icon: Settings },
 ];
 
+const adminNavItems = [
+  { href: "/feedback/admin", label: "反馈管理", icon: ShieldCheck },
+];
+
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { user } = useAuth();
+
+  const isAdmin = user?.email ? ADMIN_EMAILS.includes(user.email) : false;
+  const navItems = isAdmin ? [...commonNavItems, ...adminNavItems] : commonNavItems;
+
+  const activeItem = navItems
+    .filter(n => pathname === n.href || pathname.startsWith(n.href + "/"))
+    .sort((a, b) => b.href.length - a.href.length)[0];
 
   const NavContent = () => (
     <nav className="flex flex-col gap-1 px-2">
-      {navItems.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          onClick={onClose}
-          className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-            pathname === item.href || pathname.startsWith(item.href + "/")
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-          )}
-        >
-          <item.icon className="h-4 w-4" />
-          {item.label}
-        </Link>
-      ))}
+      {navItems.map((item) => {
+        const isActive = activeItem?.href === item.href;
+
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={onClose}
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              isActive
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            )}
+          >
+            <item.icon className="h-4 w-4" />
+            {item.label}
+          </Link>
+        );
+      })}
     </nav>
   );
 

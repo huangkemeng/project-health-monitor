@@ -825,10 +825,15 @@ export async function getAccessibleProjects(
     accessibleGroupIds: null,
   });
 
-  // 2. 获取所有共享项目
+  // 2. 获取活跃的共享项目（只包括 status = active 的）
   const sharedProjects = await getSharedProjects(userId, userEmail);
 
   for (const project of sharedProjects) {
+    // 只处理活跃的共享项目
+    if (project.status !== 'active') {
+      continue;
+    }
+
     const permission = await checkProjectPermission(userId, userEmail, project.owner_id);
     if (permission.isCollaborator) {
       projects.push({

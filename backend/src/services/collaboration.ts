@@ -308,15 +308,17 @@ export async function updateCollaborator(
   try {
     await connection.beginTransaction();
 
-    // 验证协作者是否存在且属于该所有者
+    // 验证协作者是否存在且属于该所有者，同时获取协作者的userId用于清除缓存
     const [existing] = await connection.execute(
-      'SELECT id FROM project_collaborators WHERE id = ? AND project_owner_id = ?',
+      'SELECT id, collaborator_user_id FROM project_collaborators WHERE id = ? AND project_owner_id = ?',
       [collaboratorId, ownerId]
     );
 
     if ((existing as any[]).length === 0) {
       throw new Error('协作者不存在');
     }
+
+    const collaboratorUserId = (existing as any[])[0]?.collaborator_user_id;
 
     // 更新角色
     if (updates.role !== undefined) {
@@ -348,6 +350,11 @@ export async function updateCollaborator(
     }
 
     await connection.commit();
+
+    // 清除权限缓存
+    if (collaboratorUserId) {
+      clearPermissionCache(collaboratorUserId, ownerId);
+    }
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -370,6 +377,18 @@ export async function removeCollaborator(
   try {
     await connection.beginTransaction();
 
+    // 先获取协作者的userId用于清除缓存
+    const [existing] = await connection.execute(
+      'SELECT collaborator_user_id FROM project_collaborators WHERE id = ? AND project_owner_id = ?',
+      [collaboratorId, ownerId]
+    );
+
+    if ((existing as any[]).length === 0) {
+      throw new Error('协作者不存在');
+    }
+
+    const collaboratorUserId = (existing as any[])[0]?.collaborator_user_id;
+
     // 先删除关联的分组记录
     await connection.execute(
       'DELETE FROM project_collaborator_groups WHERE collaborator_id = ?',
@@ -390,6 +409,11 @@ export async function removeCollaborator(
     }
 
     await connection.commit();
+
+    // 清除权限缓存
+    if (collaboratorUserId) {
+      clearPermissionCache(collaboratorUserId, ownerId);
+    }
   } catch (err) {
     await connection.rollback();
     throw err;

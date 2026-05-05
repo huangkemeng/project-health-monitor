@@ -238,7 +238,14 @@ export default function MonitorsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const { canEdit } = useProject();
+  const { canEdit, project, loading: projectLoading } = useProject();
+  
+  // 调试日志
+  useEffect(() => {
+    console.log('MonitorsPage - project:', project);
+    console.log('MonitorsPage - canEdit:', canEdit);
+    console.log('MonitorsPage - projectLoading:', projectLoading);
+  }, [project, canEdit, projectLoading]);
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [groups, setGroups] = useState<MonitorGroup[]>([]);
   const [loading, setLoading] = useState(true);

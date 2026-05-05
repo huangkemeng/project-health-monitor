@@ -81,6 +81,215 @@ router.get(
   }
 );
 
+// GET /api/feedback/notifications - Get user notifications
+router.get(
+  '/notifications',
+  authenticate,
+  async (req: Request, res: Response) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.page_size as string) || 20;
+      const { getUserNotifications } = await import('../services/notification');
+      const result = await getUserNotifications(req.user!.userId, page, pageSize);
+      success(res, result);
+    } catch (err) {
+      console.error('Get notifications error:', err);
+      error(res, '获取通知列表失败');
+    }
+  }
+);
+
+// GET /api/feedback/notifications/unread-count - Get unread count
+router.get(
+  '/notifications/unread-count',
+  authenticate,
+  async (req: Request, res: Response) => {
+    try {
+      const { getUnreadCount } = await import('../services/notification');
+      const count = await getUnreadCount(req.user!.userId);
+      success(res, { count });
+    } catch (err) {
+      console.error('Get unread count error:', err);
+      error(res, '获取未读通知数失败');
+    }
+  }
+);
+
+// PUT /api/feedback/notifications/:id/read - Mark notification as read
+router.put(
+  '/notifications/:id/read',
+  authenticate,
+  [param('id').isUUID().withMessage('无效的通知ID')],
+  async (req: Request, res: Response) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        validationError(res, errors.array().map(e => ({
+          field: e.type === 'field' ? e.path : 'unknown',
+          message: e.msg,
+        })));
+        return;
+      }
+      const { markAsRead } = await import('../services/notification');
+      await markAsRead(req.params.id, req.user!.userId);
+      success(res, null, '已标记为已读');
+    } catch (err) {
+      console.error('Mark notification read error:', err);
+      error(res, '标记已读失败');
+    }
+  }
+);
+
+// PUT /api/feedback/notifications/read-all - Mark all as read
+router.put(
+  '/notifications/read-all',
+  authenticate,
+  async (req: Request, res: Response) => {
+    try {
+      const { markAllAsRead } = await import('../services/notification');
+      await markAllAsRead(req.user!.userId);
+      success(res, null, '已全部标记为已读');
+    } catch (err) {
+      console.error('Mark all notifications read error:', err);
+      error(res, '操作失败');
+    }
+  }
+);
+
+// GET /api/feedback/admin/all - Admin: get all feedbacks
+router.get(
+  '/admin/all',
+  authenticate,
+  async (req: Request, res: Response) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.page_size as string) || 20;
+      const status = req.query.status as string;
+      const type = req.query.type as string;
+      const keyword = req.query.keyword as string;
+
+      const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean);
+      const user = await queryOne<{ email: string }>('SELECT email FROM users WHERE id = ?', [req.user!.userId]);
+      if (!user || !adminEmails.includes(user.email)) {
+        forbidden(res, '无权访问管理功能');
+        return;
+      }
+
+      const result = await feedbackService.getAllFeedbacksForAdmin({
+        page, page_size: pageSize, status, type, keyword,
+      });
+      success(res, result);
+    } catch (err) {
+      console.error('Admin get feedbacks error:', err);
+      error(res, '获取反馈列表失败');
+    }
+  }
+);
+
+// GET /api/feedback/admin/stats - Admin: get stats
+router.get(
+  '/admin/stats',
+  authenticate,
+  async (req: Request, res: Response) => {
+    try {
+      const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean);
+      const user = await queryOne<{ email: string }>('SELECT email FROM users WHERE id = ?', [req.user!.userId]);
+      if (!user || !adminEmails.includes(user.email)) {
+        forbidden(res, '无权访问管理功能');
+        return;
+      }
+
+      const stats = await feedbackService.getFeedbackStats();
+      success(res, stats);
+    } catch (err) {
+      console.error('Admin get stats error:', err);
+      error(res, '获取统计信息失败');
+    }
+  }
+);
+
+// PUT /api/feedback/admin/:id/assign - Admin: assign handler
+router.put(
+  '/admin/:id/assign',
+  authenticate,
+  [
+    param('id').isUUID().withMessage('无效的反馈ID'),
+    body('assigned_to').isString().withMessage('请指定处理人'),
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        validationError(res, errors.array().map(e => ({
+          field: e.type === 'field' ? e.path : 'unknown',
+          message: e.msg,
+        })));
+        return;
+      }
+
+      const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean);
+      const user = await queryOne<{ email: string }>('SELECT email FROM users WHERE id = ?', [req.user!.userId]);
+      if (!user || !adminEmails.includes(user.email)) {
+        forbidden(res, '无权访问管理功能');
+        return;
+      }
+
+      await feedbackService.assignFeedback(req.params.id, req.body.assigned_to, req.user!.userId);
+      success(res, null, '分配成功');
+    } catch (err) {
+      if (err instanceof Error && err.message === '反馈不存在') {
+        notFound(res, '反馈不存在');
+        return;
+      }
+      console.error('Assign feedback error:', err);
+      error(res, '分配处理人失败');
+    }
+  }
+);
+
+// POST /api/feedback/admin/batch - Admin: batch operations
+router.post(
+  '/admin/batch',
+  authenticate,
+  [
+    body('ids').isArray({ min: 1 }).withMessage('请选择要操作的反馈'),
+    body('ids.*').isString(),
+    body('action').isIn(['mark_processing', 'mark_fixed', 'close']).withMessage('无效的操作类型'),
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        validationError(res, errors.array().map(e => ({
+          field: e.type === 'field' ? e.path : 'unknown',
+          message: e.msg,
+        })));
+        return;
+      }
+
+      const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean);
+      const user = await queryOne<{ email: string }>('SELECT email FROM users WHERE id = ?', [req.user!.userId]);
+      if (!user || !adminEmails.includes(user.email)) {
+        forbidden(res, '无权访问管理功能');
+        return;
+      }
+
+      const { ids, action } = req.body;
+      const statusMap: Record<string, FeedbackStatus> = {
+        mark_processing: 'processing',
+        mark_fixed: 'fixed',
+        close: 'closed',
+      };
+
+      await feedbackService.batchUpdateStatus(ids, statusMap[action], req.user!.userId);
+      success(res, null, '批量操作成功');
+    } catch (err) {
+      console.error('Batch operation error:', err);
+      error(res, '批量操作失败');
+    }
+  }
+);
+
 // GET /api/feedback/:id - Get feedback detail
 router.get(
   '/:id',
@@ -278,216 +487,6 @@ router.post(
       }
       console.error('Reopen feedback error:', err);
       error(res, '重新开启反馈失败');
-    }
-  }
-);
-
-// GET /api/feedback/notifications - Get user notifications
-router.get(
-  '/notifications',
-  authenticate,
-  async (req: Request, res: Response) => {
-    try {
-      const page = parseInt(req.query.page as string) || 1;
-      const pageSize = parseInt(req.query.page_size as string) || 20;
-      const { getUserNotifications } = await import('../services/notification');
-      const result = await getUserNotifications(req.user!.userId, page, pageSize);
-      success(res, result);
-    } catch (err) {
-      console.error('Get notifications error:', err);
-      error(res, '获取通知列表失败');
-    }
-  }
-);
-
-// GET /api/feedback/notifications/unread-count - Get unread count
-router.get(
-  '/notifications/unread-count',
-  authenticate,
-  async (req: Request, res: Response) => {
-    try {
-      const { getUnreadCount } = await import('../services/notification');
-      const count = await getUnreadCount(req.user!.userId);
-      success(res, { count });
-    } catch (err) {
-      console.error('Get unread count error:', err);
-      error(res, '获取未读通知数失败');
-    }
-  }
-);
-
-// PUT /api/feedback/notifications/:id/read - Mark notification as read
-router.put(
-  '/notifications/:id/read',
-  authenticate,
-  [param('id').isUUID().withMessage('无效的通知ID')],
-  async (req: Request, res: Response) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        validationError(res, errors.array().map(e => ({
-          field: e.type === 'field' ? e.path : 'unknown',
-          message: e.msg,
-        })));
-        return;
-      }
-      const { markAsRead } = await import('../services/notification');
-      await markAsRead(req.params.id, req.user!.userId);
-      success(res, null, '已标记为已读');
-    } catch (err) {
-      console.error('Mark notification read error:', err);
-      error(res, '标记已读失败');
-    }
-  }
-);
-
-// PUT /api/feedback/notifications/read-all - Mark all as read
-router.put(
-  '/notifications/read-all',
-  authenticate,
-  async (req: Request, res: Response) => {
-    try {
-      const { markAllAsRead } = await import('../services/notification');
-      await markAllAsRead(req.user!.userId);
-      success(res, null, '已全部标记为已读');
-    } catch (err) {
-      console.error('Mark all notifications read error:', err);
-      error(res, '操作失败');
-    }
-  }
-);
-
-// GET /api/feedback/admin/all - Admin: get all feedbacks
-router.get(
-  '/admin/all',
-  authenticate,
-  async (req: Request, res: Response) => {
-    try {
-      const page = parseInt(req.query.page as string) || 1;
-      const pageSize = parseInt(req.query.page_size as string) || 20;
-      const status = req.query.status as string;
-      const type = req.query.type as string;
-      const keyword = req.query.keyword as string;
-
-      // Check admin permission
-      const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean);
-      const user = await queryOne<{ email: string }>('SELECT email FROM users WHERE id = ?', [req.user!.userId]);
-      if (!user || !adminEmails.includes(user.email)) {
-        forbidden(res, '无权访问管理功能');
-        return;
-      }
-
-      const result = await feedbackService.getAllFeedbacksForAdmin({
-        page, page_size: pageSize, status, type, keyword,
-      });
-      success(res, result);
-    } catch (err) {
-      console.error('Admin get feedbacks error:', err);
-      error(res, '获取反馈列表失败');
-    }
-  }
-);
-
-// GET /api/feedback/admin/stats - Admin: get stats
-router.get(
-  '/admin/stats',
-  authenticate,
-  async (req: Request, res: Response) => {
-    try {
-      const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean);
-      const user = await queryOne<{ email: string }>('SELECT email FROM users WHERE id = ?', [req.user!.userId]);
-      if (!user || !adminEmails.includes(user.email)) {
-        forbidden(res, '无权访问管理功能');
-        return;
-      }
-
-      const stats = await feedbackService.getFeedbackStats();
-      success(res, stats);
-    } catch (err) {
-      console.error('Admin get stats error:', err);
-      error(res, '获取统计信息失败');
-    }
-  }
-);
-
-// PUT /api/feedback/admin/:id/assign - Admin: assign handler
-router.put(
-  '/admin/:id/assign',
-  authenticate,
-  [
-    param('id').isUUID().withMessage('无效的反馈ID'),
-    body('assigned_to').isString().withMessage('请指定处理人'),
-  ],
-  async (req: Request, res: Response) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        validationError(res, errors.array().map(e => ({
-          field: e.type === 'field' ? e.path : 'unknown',
-          message: e.msg,
-        })));
-        return;
-      }
-
-      const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean);
-      const user = await queryOne<{ email: string }>('SELECT email FROM users WHERE id = ?', [req.user!.userId]);
-      if (!user || !adminEmails.includes(user.email)) {
-        forbidden(res, '无权访问管理功能');
-        return;
-      }
-
-      await feedbackService.assignFeedback(req.params.id, req.body.assigned_to, req.user!.userId);
-      success(res, null, '分配成功');
-    } catch (err) {
-      if (err instanceof Error && err.message === '反馈不存在') {
-        notFound(res, '反馈不存在');
-        return;
-      }
-      console.error('Assign feedback error:', err);
-      error(res, '分配处理人失败');
-    }
-  }
-);
-
-// POST /api/feedback/admin/batch - Admin: batch operations
-router.post(
-  '/admin/batch',
-  authenticate,
-  [
-    body('ids').isArray({ min: 1 }).withMessage('请选择要操作的反馈'),
-    body('ids.*').isString(),
-    body('action').isIn(['mark_processing', 'mark_fixed', 'close']).withMessage('无效的操作类型'),
-  ],
-  async (req: Request, res: Response) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        validationError(res, errors.array().map(e => ({
-          field: e.type === 'field' ? e.path : 'unknown',
-          message: e.msg,
-        })));
-        return;
-      }
-
-      const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean);
-      const user = await queryOne<{ email: string }>('SELECT email FROM users WHERE id = ?', [req.user!.userId]);
-      if (!user || !adminEmails.includes(user.email)) {
-        forbidden(res, '无权访问管理功能');
-        return;
-      }
-
-      const { ids, action } = req.body;
-      const statusMap: Record<string, FeedbackStatus> = {
-        mark_processing: 'processing',
-        mark_fixed: 'fixed',
-        close: 'closed',
-      };
-
-      await feedbackService.batchUpdateStatus(ids, statusMap[action], req.user!.userId);
-      success(res, null, '批量操作成功');
-    } catch (err) {
-      console.error('Batch operation error:', err);
-      error(res, '批量操作失败');
     }
   }
 );

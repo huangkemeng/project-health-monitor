@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Bell, History, Settings, Webhook, X, FolderOpen } from "lucide-react";
+import { Activity, Bell, History, Settings, Webhook, X, FolderOpen, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,7 @@ const navItems = [
   { href: "/groups", label: "分组管理", icon: FolderOpen },
   { href: "/history", label: "历史记录", icon: History },
   { href: "/webhooks", label: "Webhook", icon: Webhook },
+  { href: "/feedback", label: "问题反馈", icon: MessageCircle },
   { href: "/settings", label: "设置", icon: Settings },
 ];
 

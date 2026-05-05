@@ -198,10 +198,114 @@ CREATE TABLE IF NOT EXISTS project_rejections (
   INDEX idx_rejections_user (user_id),
   INDEX idx_rejections_project (project_owner_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Feedback table
+CREATE TABLE IF NOT EXISTS feedback (
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  user_id CHAR(36),
+  guest_email VARCHAR(100),
+  type ENUM('bug', 'feature_request', 'other') NOT NULL,
+  title VARCHAR(100) NOT NULL,
+  description TEXT NOT NULL,
+  steps_to_reproduce TEXT,
+  expected_behavior TEXT,
+  actual_behavior TEXT,
+  contact VARCHAR(100),
+  status ENUM('pending', 'processing', 'fixed', 'closed', 'duplicate') NOT NULL DEFAULT 'pending',
+  duplicate_of CHAR(36),
+  page_url VARCHAR(500),
+  browser_info VARCHAR(500),
+  browser_language VARCHAR(20),
+  screen_resolution VARCHAR(20),
+  operating_system VARCHAR(100),
+  system_version VARCHAR(50),
+  assigned_to CHAR(36),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (duplicate_of) REFERENCES feedback(id) ON DELETE SET NULL,
+  FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_feedback_user (user_id),
+  INDEX idx_feedback_status (status),
+  INDEX idx_feedback_type (type),
+  INDEX idx_feedback_created_at (created_at),
+  INDEX idx_feedback_status_created (status, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Feedback replies table
+CREATE TABLE IF NOT EXISTS feedback_replies (
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  feedback_id CHAR(36) NOT NULL,
+  user_id CHAR(36),
+  content TEXT NOT NULL,
+  is_admin_reply BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (feedback_id) REFERENCES feedback(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_replies_feedback (feedback_id),
+  INDEX idx_replies_created (feedback_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Feedback attachments table
+CREATE TABLE IF NOT EXISTS feedback_attachments (
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  feedback_id CHAR(36),
+  reply_id CHAR(36),
+  file_name VARCHAR(255) NOT NULL,
+  file_path VARCHAR(500) NOT NULL,
+  file_size INT NOT NULL,
+  mime_type VARCHAR(50) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (feedback_id) REFERENCES feedback(id) ON DELETE CASCADE,
+  FOREIGN KEY (reply_id) REFERENCES feedback_replies(id) ON DELETE CASCADE,
+  INDEX idx_attachments_feedback (feedback_id),
+  INDEX idx_attachments_reply (reply_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Feedback timeline table
+CREATE TABLE IF NOT EXISTS feedback_timeline (
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  feedback_id CHAR(36) NOT NULL,
+  action_type VARCHAR(30) NOT NULL,
+  old_status VARCHAR(20),
+  new_status VARCHAR(20),
+  content TEXT,
+  operator_id CHAR(36),
+  reply_id CHAR(36),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (feedback_id) REFERENCES feedback(id) ON DELETE CASCADE,
+  FOREIGN KEY (operator_id) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (reply_id) REFERENCES feedback_replies(id) ON DELETE SET NULL,
+  INDEX idx_timeline_feedback (feedback_id),
+  INDEX idx_timeline_created (feedback_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Feedback notifications table
+CREATE TABLE IF NOT EXISTS feedback_notifications (
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  user_id CHAR(36) NOT NULL,
+  feedback_id CHAR(36) NOT NULL,
+  type ENUM('status_change', 'reply', 'admin_reply', 'system') NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  content TEXT,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (feedback_id) REFERENCES feedback(id) ON DELETE CASCADE,
+  INDEX idx_notifications_user_read (user_id, is_read),
+  INDEX idx_notifications_user_created (user_id, created_at DESC),
+  INDEX idx_notifications_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 `;
 
 export const dropTablesSQL = `
+DROP TABLE IF EXISTS feedback_notifications;
+DROP TABLE IF EXISTS feedback_timeline;
+DROP TABLE IF EXISTS feedback_attachments;
+DROP TABLE IF EXISTS feedback_replies;
+DROP TABLE IF EXISTS feedback;
 DROP TABLE IF EXISTS project_rejections;
+DROP TABLE IF EXISTS project_collaborator_groups;
 DROP TABLE IF EXISTS project_collaborators;
 DROP TABLE IF EXISTS cron_job_logs;
 DROP TABLE IF EXISTS login_attempts;

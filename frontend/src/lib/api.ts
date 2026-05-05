@@ -17,7 +17,14 @@ import {
   SharedProject,
   ProjectContext,
   CreateCollaboratorData,
-  UpdateCollaboratorData
+  UpdateCollaboratorData,
+  Feedback,
+  FeedbackListItem,
+  FeedbackReply,
+  FeedbackStats,
+  FeedbackNotification,
+  CreateFeedbackData,
+  FeedbackStatus,
 } from '@/types';
 import { emitRateLimitError, emitError } from '@/lib/error-events';
 import { ApiException } from '@/lib/error-handler';
@@ -278,6 +285,71 @@ export const collaborationApi = {
 
   getCurrentProject: (ownerId?: string, config?: AxiosRequestConfig) =>
     apiClient.get<{ project: ProjectContext }>('/projects/current', { params: ownerId ? { owner_id: ownerId } : undefined, ...config }),
+};
+
+// Feedback API
+export const feedbackApi = {
+  create: (data: CreateFeedbackData) =>
+    apiClient.post<Feedback>('/feedback', data),
+
+  list: (params?: {
+    page?: number;
+    page_size?: number;
+    status?: string;
+    type?: string;
+    keyword?: string;
+    start_date?: string;
+    end_date?: string;
+  }) =>
+    apiClient.get<{ items: FeedbackListItem[]; pagination: { page: number; page_size: number; total: number; total_pages: number } }>('/feedback', { params }),
+
+  get: (id: string) =>
+    apiClient.get<Feedback>(`/feedback/${id}`),
+
+  addReply: (id: string, data: { content: string; attachment_ids?: string[] }) =>
+    apiClient.post<FeedbackReply>(`/feedback/${id}/reply`, data),
+
+  updateStatus: (id: string, data: { status: FeedbackStatus; reason: string; duplicate_of?: string }) =>
+    apiClient.put(`/feedback/${id}/status`, data),
+
+  close: (id: string) =>
+    apiClient.post(`/feedback/${id}/close`),
+
+  reopen: (id: string) =>
+    apiClient.post(`/feedback/${id}/reopen`),
+
+  adminList: (params?: {
+    page?: number;
+    page_size?: number;
+    status?: string;
+    type?: string;
+    keyword?: string;
+  }) =>
+    apiClient.get<{ items: FeedbackListItem[]; pagination: { page: number; page_size: number; total: number; total_pages: number } }>('/feedback/admin/all', { params }),
+
+  adminStats: () =>
+    apiClient.get<FeedbackStats>('/feedback/admin/stats'),
+
+  adminAssign: (id: string, userId: string) =>
+    apiClient.put(`/feedback/admin/${id}/assign`, { assigned_to: userId }),
+
+  adminBatch: (data: { ids: string[]; action: string; value?: string }) =>
+    apiClient.post('/feedback/admin/batch', data),
+};
+
+// Notification API
+export const notificationApi = {
+  list: (params?: { page?: number; page_size?: number }) =>
+    apiClient.get<{ items: FeedbackNotification[]; pagination: { page: number; page_size: number; total: number; total_pages: number } }>('/feedback/notifications', { params }),
+
+  unreadCount: () =>
+    apiClient.get<{ count: number }>('/feedback/notifications/unread-count'),
+
+  markAsRead: (id: string) =>
+    apiClient.put(`/feedback/notifications/${id}/read`),
+
+  markAllAsRead: () =>
+    apiClient.put('/feedback/notifications/read-all'),
 };
 
 export default api;

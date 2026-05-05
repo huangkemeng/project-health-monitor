@@ -261,6 +261,31 @@ export interface DashboardData {
   stats: DashboardStats;
 }
 
+// Notification Types
+export type NotificationType = 'status_change' | 'reply' | 'admin_reply' | 'system';
+
+export interface FeedbackNotification {
+  id: string;
+  user_id: string;
+  feedback_id: string;
+  type: NotificationType;
+  title: string;
+  content: string | null;
+  is_read: boolean;
+  created_at: Date;
+}
+
+export interface FeedbackNotificationResponse {
+  id: string;
+  feedback_id: string;
+  feedback_no: string;
+  type: NotificationType;
+  title: string;
+  content: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
 // JWT Payload
 export interface JwtPayload {
   userId: string;
@@ -289,10 +314,157 @@ export interface LoginAttempt {
   attempted_at: Date;
 }
 
+// Feedback Types
+export type FeedbackType = 'bug' | 'feature_request' | 'other';
+export type FeedbackStatus = 'pending' | 'processing' | 'fixed' | 'closed' | 'duplicate';
+export type TimelineActionType = 'created' | 'status_changed' | 'replied' | 'reopened';
+
+export interface Feedback {
+  id: string;
+  user_id: string | null;
+  guest_email: string | null;
+  type: FeedbackType;
+  title: string;
+  description: string;
+  steps_to_reproduce: string | null;
+  expected_behavior: string | null;
+  actual_behavior: string | null;
+  contact: string | null;
+  status: FeedbackStatus;
+  duplicate_of: string | null;
+  page_url: string | null;
+  browser_info: string | null;
+  browser_language: string | null;
+  screen_resolution: string | null;
+  operating_system: string | null;
+  system_version: string | null;
+  assigned_to: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface FeedbackResponse {
+  id: string;
+  feedback_no: string;
+  type: FeedbackType;
+  title: string;
+  description: string;
+  steps_to_reproduce: string | null;
+  expected_behavior: string | null;
+  actual_behavior: string | null;
+  contact: string | null;
+  status: FeedbackStatus;
+  duplicate_of: string | null;
+  duplicate_title?: string | null;
+  page_url: string | null;
+  browser_info: string | null;
+  browser_language: string | null;
+  screen_resolution: string | null;
+  operating_system: string | null;
+  system_version: string | null;
+  submitter_name?: string;
+  attachments?: FeedbackAttachment[];
+  timeline?: FeedbackTimelineResponse[];
+  replies?: FeedbackReplyResponse[];
+  created_at: Date;
+  updated_at: Date;
+  is_own_project?: boolean;
+  role?: CollaboratorRole | null;
+}
+
+export interface FeedbackListItem {
+  id: string;
+  feedback_no: string;
+  type: FeedbackType;
+  title: string;
+  status: FeedbackStatus;
+  submitter_name?: string;
+  reply_count: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CreateFeedbackData {
+  type: FeedbackType;
+  title: string;
+  description: string;
+  steps_to_reproduce?: string;
+  expected_behavior?: string;
+  actual_behavior?: string;
+  contact?: string;
+  page_url?: string;
+  browser_info?: string;
+  browser_language?: string;
+  screen_resolution?: string;
+  operating_system?: string;
+  system_version?: string;
+  attachment_ids?: string[];
+}
+
+export interface FeedbackAttachment {
+  id: string;
+  feedback_id: string | null;
+  reply_id: string | null;
+  file_name: string;
+  file_path: string;
+  file_size: number;
+  mime_type: string;
+  created_at: Date;
+}
+
+export interface FeedbackReply {
+  id: string;
+  feedback_id: string;
+  user_id: string | null;
+  content: string;
+  is_admin_reply: boolean;
+  created_at: Date;
+}
+
+export interface FeedbackReplyResponse {
+  id: string;
+  content: string;
+  is_admin_reply: boolean;
+  author_name?: string;
+  attachments?: FeedbackAttachment[];
+  created_at: Date;
+}
+
+export interface FeedbackTimeline {
+  id: string;
+  feedback_id: string;
+  action_type: TimelineActionType;
+  old_status: string | null;
+  new_status: string | null;
+  content: string | null;
+  operator_id: string | null;
+  reply_id: string | null;
+  created_at: Date;
+}
+
+export interface FeedbackTimelineResponse {
+  id: string;
+  action_type: TimelineActionType;
+  old_status: string | null;
+  new_status: string | null;
+  content: string | null;
+  operator_name?: string;
+  created_at: Date;
+}
+
+export interface FeedbackStats {
+  pending_count: number;
+  processing_count: number;
+  today_count: number;
+  week_count: number;
+  avg_response_time: number;
+}
+
 // JWT Payload
 export interface JwtPayload {
   userId: string;
   username: string;
+  email: string;
   iat: number;
   exp: number;
 }

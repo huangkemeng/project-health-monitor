@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import { ToastProvider } from "@/components/ui/toast";
 import { GlobalErrorHandler } from "@/components/GlobalErrorHandler";
 import { ThemeProvider } from "@/hooks/use-theme";
+import { FeedbackButton } from "@/components/feedback/FeedbackButton";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -26,6 +27,7 @@ export default function RootLayout({
             <AuthProvider>
               {children}
               <GlobalErrorHandler />
+              <FeedbackButton />
             </AuthProvider>
           </ToastProvider>
         </ThemeProvider>

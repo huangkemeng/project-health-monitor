@@ -392,3 +392,114 @@ export interface UpdateCollaboratorData {
   role?: CollaboratorRole;
   groupIds?: string[] | null;
 }
+
+// Feedback Types
+export type FeedbackType = 'bug' | 'feature_request' | 'other';
+export type FeedbackStatus = 'pending' | 'processing' | 'fixed' | 'closed' | 'duplicate';
+
+export interface Feedback {
+  id: string;
+  feedback_no: string;
+  type: FeedbackType;
+  title: string;
+  description: string;
+  steps_to_reproduce: string | null;
+  expected_behavior: string | null;
+  actual_behavior: string | null;
+  contact: string | null;
+  status: FeedbackStatus;
+  duplicate_of: string | null;
+  duplicate_title?: string | null;
+  page_url: string | null;
+  browser_info: string | null;
+  browser_language: string | null;
+  screen_resolution: string | null;
+  operating_system: string | null;
+  system_version: string | null;
+  submitter_name?: string;
+  attachments?: FeedbackAttachment[];
+  timeline?: FeedbackTimelineItem[];
+  replies?: FeedbackReply[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeedbackListItem {
+  id: string;
+  feedback_no: string;
+  type: FeedbackType;
+  title: string;
+  status: FeedbackStatus;
+  submitter_name?: string;
+  reply_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateFeedbackData {
+  type: FeedbackType;
+  title: string;
+  description: string;
+  steps_to_reproduce?: string;
+  expected_behavior?: string;
+  actual_behavior?: string;
+  contact?: string;
+  page_url?: string;
+  browser_info?: string;
+  browser_language?: string;
+  screen_resolution?: string;
+  operating_system?: string;
+  system_version?: string;
+  attachment_ids?: string[];
+}
+
+export interface FeedbackAttachment {
+  id: string;
+  feedback_id: string | null;
+  reply_id: string | null;
+  file_name: string;
+  file_url: string;
+  file_size: number;
+  mime_type: string;
+  created_at: string;
+}
+
+export interface FeedbackReply {
+  id: string;
+  content: string;
+  is_admin_reply: boolean;
+  author_name?: string;
+  attachments?: FeedbackAttachment[];
+  created_at: string;
+}
+
+export interface FeedbackTimelineItem {
+  id: string;
+  action_type: 'created' | 'status_changed' | 'replied' | 'reopened';
+  old_status: string | null;
+  new_status: string | null;
+  content: string | null;
+  operator_name?: string;
+  created_at: string;
+}
+
+export interface FeedbackStats {
+  pending_count: number;
+  processing_count: number;
+  today_count: number;
+  week_count: number;
+  avg_response_time: number;
+}
+
+export type NotificationType = 'status_change' | 'reply' | 'admin_reply' | 'system';
+
+export interface FeedbackNotification {
+  id: string;
+  feedback_id: string;
+  feedback_no: string;
+  type: NotificationType;
+  title: string;
+  content: string | null;
+  is_read: boolean;
+  created_at: string;
+}

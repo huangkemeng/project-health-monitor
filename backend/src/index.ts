@@ -19,6 +19,7 @@ import cronRoutes from './routes/cron';
 import collaboratorsRoutes from './routes/collaborators';
 import sharedProjectsRoutes from './routes/shared-projects';
 import projectsRoutes from './routes/projects';
+import feedbackRoutes from './routes/feedback';
 
 dotenv.config();
 
@@ -180,6 +181,7 @@ app.use('/api/cron', cronRoutes);
 app.use('/api/collaborators', collaboratorsRoutes);
 app.use('/api/shared-projects', sharedProjectsRoutes);
 app.use('/api/projects', projectsRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // Error handling
 app.use(notFoundHandler);

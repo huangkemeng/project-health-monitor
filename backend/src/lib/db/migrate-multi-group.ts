@@ -26,38 +26,48 @@ export async function migrateMultiGroupSupport(): Promise<void> {
     `);
 
     // 2. 迁移现有数据 - 将旧表中的 group_id 迁移到新表
-    const [existingCollaborators] = await connection.execute(`
-      SELECT id, group_id FROM project_collaborators WHERE group_id IS NOT NULL
-    `);
+    // 先检查旧表是否有 group_id 列（新表结构可能已无此列）
+    const [columns] = await connection.execute(
+      `SHOW COLUMNS FROM project_collaborators LIKE 'group_id'`
+    );
+    const hasOldGroupIdColumn = (columns as any[]).length > 0;
 
-    for (const collab of existingCollaborators as any[]) {
-      try {
-        await connection.execute(`
-          INSERT INTO project_collaborator_groups (collaborator_id, group_id)
-          VALUES (?, ?)
-          ON DUPLICATE KEY UPDATE group_id = group_id
-        `, [collab.id, collab.group_id]);
-      } catch (err) {
-        // 忽略重复键错误
-        console.log(`Skipping duplicate entry for collaborator ${collab.id}`);
+    if (hasOldGroupIdColumn) {
+      const [existingCollaborators] = await connection.execute(`
+        SELECT id, group_id FROM project_collaborators WHERE group_id IS NOT NULL
+      `);
+
+      for (const collab of existingCollaborators as any[]) {
+        try {
+          await connection.execute(`
+            INSERT INTO project_collaborator_groups (collaborator_id, group_id)
+            VALUES (?, ?)
+            ON DUPLICATE KEY UPDATE group_id = group_id
+          `, [collab.id, collab.group_id]);
+        } catch (err) {
+          // 忽略重复键错误
+          console.log(`Skipping duplicate entry for collaborator ${collab.id}`);
+        }
       }
-    }
 
-    // 3. 添加特殊标识 '__UNGROUPED__' 的记录
-    const [ungroupedCollaborators] = await connection.execute(`
-      SELECT id FROM project_collaborators WHERE group_id = '__UNGROUPED__'
-    `);
+      // 3. 添加特殊标识 '__UNGROUPED__' 的记录
+      const [ungroupedCollaborators] = await connection.execute(`
+        SELECT id FROM project_collaborators WHERE group_id = '__UNGROUPED__'
+      `);
 
-    for (const collab of ungroupedCollaborators as any[]) {
-      try {
-        await connection.execute(`
-          INSERT INTO project_collaborator_groups (collaborator_id, group_id)
-          VALUES (?, '__UNGROUPED__')
-          ON DUPLICATE KEY UPDATE group_id = '__UNGROUPED__'
-        `, [collab.id]);
-      } catch (err) {
-        console.log(`Skipping duplicate ungrouped entry for collaborator ${collab.id}`);
+      for (const collab of ungroupedCollaborators as any[]) {
+        try {
+          await connection.execute(`
+            INSERT INTO project_collaborator_groups (collaborator_id, group_id)
+            VALUES (?, '__UNGROUPED__')
+            ON DUPLICATE KEY UPDATE group_id = '__UNGROUPED__'
+          `, [collab.id]);
+        } catch (err) {
+          console.log(`Skipping duplicate ungrouped entry for collaborator ${collab.id}`);
+        }
       }
+    } else {
+      console.log('  project_collaborators 已使用新表结构，跳过旧数据迁移');
     }
 
     await connection.commit();

@@ -124,7 +124,7 @@ function MonitorCard({
   selectable,
   selected,
   onSelect,
-  canEdit = true,
+  canEdit = false,
 }: MonitorCardProps) {
   return (
     <Card className={cn(

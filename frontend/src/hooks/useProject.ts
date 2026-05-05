@@ -14,10 +14,13 @@ export function useProject() {
       setLoading(true);
       // 从 localStorage 获取当前项目 owner_id
       const ownerId = localStorage.getItem('project_context_owner_id');
+      console.log('useProject - ownerId from localStorage:', ownerId);
       const response = await collaborationApi.getCurrentProject(ownerId || undefined);
+      console.log('useProject - API response:', response);
       setProject(response.project);
       setError(null);
     } catch (err: any) {
+      console.error('useProject - Error:', err);
       setError(err.message || '获取项目信息失败');
       setProject(null);
     } finally {

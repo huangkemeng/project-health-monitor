@@ -209,6 +209,8 @@ router.get('/current', authenticate, async (req: Request, res: Response) => {
       targetOwnerId
     );
 
+    console.log('checkProjectPermission result:', { userId, targetOwnerId, permission });
+
     if (!permission.isCollaborator) {
       return error(res, '您没有权限访问此项目', 403);
     }
@@ -240,15 +242,18 @@ router.get('/current', authenticate, async (req: Request, res: Response) => {
       accessibleGroups = (groups as any[]).map((g) => ({ id: g.id, name: g.name }));
     }
 
+    const projectData = {
+      owner_id: targetOwnerId,
+      owner_username: (owner as any).username,
+      owner_email: (owner as any).email,
+      role: permission.role,
+      accessible_groups: accessibleGroups,
+      is_own_project: false,
+    };
+    console.log('Returning project data:', projectData);
+
     success(res, {
-      project: {
-        owner_id: targetOwnerId,
-        owner_username: (owner as any).username,
-        owner_email: (owner as any).email,
-        role: permission.role,
-        accessible_groups: accessibleGroups,
-        is_own_project: false,
-      },
+      project: projectData,
     });
   } catch (err) {
     console.error('Get current project error:', err);

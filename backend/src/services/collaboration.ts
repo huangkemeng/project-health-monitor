@@ -674,7 +674,7 @@ export async function checkProjectPermission(
 
   // 2. 检查是否是协作者
   const [collaborations] = await pool.execute(
-    `SELECT id, group_id, role
+    `SELECT id, role
      FROM project_collaborators
      WHERE project_owner_id = ?
        AND status = 'active'

@@ -195,27 +195,31 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {monitor.status === "active" ? (
-              <Button variant="outline" onClick={handlePause}>
-                <Pause className="h-4 w-4 mr-2" />
-                暂停
-              </Button>
-            ) : (
-              <Button onClick={handleResume}>
-                <Play className="h-4 w-4 mr-2" />
-                恢复
-              </Button>
+            {(monitor.role === 'owner' || monitor.role === 'editor') && (
+              <>
+                {monitor.status === "active" ? (
+                  <Button variant="outline" onClick={handlePause}>
+                    <Pause className="h-4 w-4 mr-2" />
+                    暂停
+                  </Button>
+                ) : (
+                  <Button onClick={handleResume}>
+                    <Play className="h-4 w-4 mr-2" />
+                    恢复
+                  </Button>
+                )}
+                <Button variant="outline" asChild>
+                  <Link href={`/monitors/${params.id}/edit`}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    编辑
+                  </Link>
+                </Button>
+                <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  删除
+                </Button>
+              </>
             )}
-            <Button variant="outline" asChild>
-              <Link href={`/monitors/${params.id}/edit`}>
-                <Edit className="h-4 w-4 mr-2" />
-                编辑
-              </Link>
-            </Button>
-            <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-              <Trash2 className="h-4 w-4 mr-2" />
-              删除
-            </Button>
           </div>
         </div>
 

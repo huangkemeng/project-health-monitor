@@ -20,8 +20,10 @@ import collaboratorsRoutes from './routes/collaborators';
 import sharedProjectsRoutes from './routes/shared-projects';
 import projectsRoutes from './routes/projects';
 import feedbackRoutes from './routes/feedback';
+import path from 'path';
 
-dotenv.config();
+const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
+dotenv.config({ path: path.resolve(process.cwd(), envFile) });
 
 const app = express();
 const PORT = process.env.PORT || 3001;

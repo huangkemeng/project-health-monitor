@@ -376,10 +376,10 @@ export async function removeCollaborator(
       [collaboratorId]
     );
 
-    // 更新协作者状态为 removed
+    // 更新协作者状态为 rejected（撤销邀请）
     const [result] = await connection.execute(
       `UPDATE project_collaborators 
-       SET status = 'removed', 
+       SET status = 'rejected', 
            updated_at = NOW() 
        WHERE id = ? AND project_owner_id = ?`,
       [collaboratorId, ownerId]
@@ -416,7 +416,7 @@ export async function getSharedProjects(
     [userId, userEmail]
   );
 
-  // 查询用户的所有共享项目（包括已拒绝/被撤销的），取最新的记录
+  // 查询用户的所有共享项目（包括已拒绝/被撤销的）
   const [rows] = await pool.execute(
     `SELECT
       u.id as owner_id,
@@ -430,18 +430,20 @@ export async function getSharedProjects(
      JOIN users u ON pc.project_owner_id = u.id
      LEFT JOIN project_rejections pr ON pr.user_id = ? AND pr.project_owner_id = pc.project_owner_id
      WHERE (pc.collaborator_user_id = ? OR pc.collaborator_email = ?)
-       AND pc.id = (
-         SELECT id FROM project_collaborators
-         WHERE project_owner_id = pc.project_owner_id
-           AND (collaborator_user_id = ? OR collaborator_email = ?)
-         ORDER BY created_at DESC
-         LIMIT 1
-       )
      ORDER BY pc.created_at DESC`,
-    [userId, userEmail, userId, userId, userEmail, userId, userEmail]
+    [userId, userId, userEmail]
   );
 
-  const projects = rows as any[];
+  const allProjects = rows as any[];
+
+  // 按 project_owner_id 去重，只保留最新的记录
+  const projectMap = new Map<string, any>();
+  for (const project of allProjects) {
+    if (!projectMap.has(project.owner_id)) {
+      projectMap.set(project.owner_id, project);
+    }
+  }
+  const projects = Array.from(projectMap.values());
 
   // 为每个项目获取分组信息
   const result: SharedProject[] = [];

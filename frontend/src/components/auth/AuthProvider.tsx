@@ -13,9 +13,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
-      // 清理旧的项目上下文（新设计不再需要）
-      localStorage.removeItem('project_context_owner_id');
-
       // 如果有 token 但没有用户信息，尝试获取用户信息
       if (token && !isAuthenticated) {
         try {
